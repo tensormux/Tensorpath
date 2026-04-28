@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Recommendation — {{ result.model_name }}{% endblock %}
+
+{% macro plan_card(plan, recommended=False) %}
+<div class="card {% if recommended %}recommended{% endif %}">
+  <div class="card-header">
+    <div>
+      <div class="card-title">
+        {{ plan.gpu_name }} &middot; {{ plan.backend }} &middot; {{ plan.quantization }}
+      </div>
+      <div class="alt-meta">rank #{{ plan.rank }}</div>
+    </div>
+    <div>
+      {% if recommended %}<span class="badge badge-recommended">Recommended</span>{% endif %}
+      <span class="badge badge-source-{{ plan.benchmark_source }}">{{ plan.benchmark_source }}</span>
+      {% if plan.is_over_provisioned %}<span class="badge badge-warn">Over-provisioned</span>{% endif %}
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div>
+      <div class="stat-label">p95 TTFT</div>
+      <div class="stat-value">{{ "%.0f"|format(plan.estimated_ttft_p95_ms) }} ms</div>
+    </div>
+    <div>
+      <div class="stat-label">Throughput</div>
+      <div class="stat-value">{{ "%.0f"|format(plan.estimated_tokens_per_sec) }} tok/s</div>
+    </div>
+    <div>
+      <div class="stat-label">VRAM</div>
+      <div class="stat-value">{{ "%.1f"|format(plan.estimated_vram_gb) }} GB</div>
+    </div>
+    <div>
+      <div class="stat-label">Hourly</div>
+      <div class="stat-value">${{ "%.2f"|format(plan.estimated_hourly_cost_usd) }}</div>
+    </div>
+    <div>
+      <div class="stat-label">Monthly est.</div>
+      <div class="stat-value">${{ "%.0f"|format(plan.estimated_monthly_cost_usd) }}</div>
+    </div>
+  </div>
+
+  <div class="scores">
+    <span class="score-chip">latency {{ "%.2f"|format(plan.scores.latency) }}</span>
+    <span class="score-chip">throughput {{ "%.2f"|format(plan.scores.throughput) }}</span>
+    <span class="score-chip">cost {{ "%.2f"|format(plan.scores.cost) }}</span>
+    <span class="score-chip">quality {{ "%.2f"|format(plan.scores.quality) }}</span>
+    <span class="score-chip">simplicity {{ "%.2f"|format(plan.scores.simplicity) }}</span>
+    <span class="score-chip"><strong>total {{ "%.2f"|format(plan.scores.weighted_total) }}</strong></span>
+  </div>
+
+  {% if plan.explanation %}
+  <details>
+    <summary>Why this plan</summary>
+    <p style="margin: 8px 0 0; font-size: 14px; color: var(--fg-muted);">{{ plan.explanation }}</p>
+  </details>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% block content %}
+<div style="margin-bottom: 16px;">
+  <a href="/" style="text-decoration: none; color: var(--accent); font-size: 13px;">&larr; Try another</a>
+</div>
+
+<h2>Recommendation for {{ result.model_name }}</h2>
+<p style="color: var(--fg-muted); margin: 0 0 16px; font-size: 13px;">
+  Workload: <strong>{{ result.workload_type }}</strong>
+  &middot; Optimizing for: <strong>{{ result.optimization_priority }}</strong>
+</p>
+
+<div class="summary">{{ result.summary }}</div>
+
+{{ plan_card(result.recommended, recommended=True) }}
+
+{% if result.alternatives %}
+  <h2 style="margin-top: 32px;">Alternatives</h2>
+  {% for alt in result.alternatives %}
+    {{ plan_card(alt) }}
+  {% endfor %}
+{% endif %}
+
+<h2 style="margin-top: 32px;">Deployment config</h2>
+<div class="card">
+  <p style="margin: 0 0 12px; font-size: 13px; color: var(--fg-muted);">
+    JSON below maps directly to NeevCloud inference deploy parameters.
+  </p>
+  <pre>{{ config.model_dump_json(indent=2) }}</pre>
+</div>
+{% endblock %}

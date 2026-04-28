@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Comparison — {{ comparison.responses|length }} models{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 16px;">
+  <a href="/compare" style="text-decoration: none; color: var(--accent); font-size: 13px;">&larr; New comparison</a>
+</div>
+
+<h2>Side-by-side comparison</h2>
+<p style="color: var(--fg-muted); margin: 0 0 16px; font-size: 13px;">
+  Workload: <strong>{{ comparison.workload_type }}</strong>
+  &middot; Optimizing for: <strong>{{ comparison.optimization_priority }}</strong>
+</p>
+
+<div class="summary">{{ comparison.summary }}</div>
+
+<div class="card" style="margin-bottom: 24px;">
+  <div class="stat-grid">
+    <div>
+      <div class="stat-label">Fastest p95 TTFT</div>
+      <div class="stat-value">{{ "%.0f"|format(comparison.highlight.fastest_p95_ms) }} ms</div>
+      <div class="alt-meta">{{ comparison.highlight.fastest_model_id }}</div>
+    </div>
+    <div>
+      <div class="stat-label">Cheapest monthly</div>
+      <div class="stat-value">${{ "%.0f"|format(comparison.highlight.cheapest_monthly_usd) }}</div>
+      <div class="alt-meta">{{ comparison.highlight.cheapest_model_id }}</div>
+    </div>
+    <div>
+      <div class="stat-label">Highest throughput</div>
+      <div class="stat-value">{{ "%.0f"|format(comparison.highlight.highest_throughput_tps) }} tok/s</div>
+      <div class="alt-meta">{{ comparison.highlight.highest_throughput_model_id }}</div>
+    </div>
+  </div>
+</div>
+
+<h2 style="margin-top: 8px;">Recommended plan per model</h2>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+{% for r in comparison.responses %}
+  {% set p = r.recommended %}
+  <div class="card {% if r.model_id == comparison.highlight.fastest_model_id %}recommended{% endif %}">
+    <div class="card-header" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+      <div class="card-title">{{ r.model_name }}</div>
+      <div class="alt-meta">{{ p.gpu_name }} &middot; {{ p.backend }} &middot; {{ p.quantization }}</div>
+      <div style="margin-top: 6px;">
+        {% if r.model_id == comparison.highlight.fastest_model_id %}<span class="badge badge-recommended">Fastest</span>{% endif %}
+        {% if r.model_id == comparison.highlight.cheapest_model_id %}<span class="badge badge-recommended" style="background: var(--good);">Cheapest</span>{% endif %}
+        {% if r.model_id == comparison.highlight.highest_throughput_model_id %}<span class="badge badge-recommended" style="background: var(--warn);">Top throughput</span>{% endif %}
+        <span class="badge badge-source-{{ p.benchmark_source }}">{{ p.benchmark_source }}</span>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div>
+        <div class="stat-label">p95 TTFT</div>
+        <div class="stat-value">{{ "%.0f"|format(p.estimated_ttft_p95_ms) }} ms</div>
+      </div>
+      <div>
+        <div class="stat-label">Tok/sec</div>
+        <div class="stat-value">{{ "%.0f"|format(p.estimated_tokens_per_sec) }}</div>
+      </div>
+      <div>
+        <div class="stat-label">VRAM</div>
+        <div class="stat-value">{{ "%.1f"|format(p.estimated_vram_gb) }} GB</div>
+      </div>
+      <div>
+        <div class="stat-label">$/mo</div>
+        <div class="stat-value">${{ "%.0f"|format(p.estimated_monthly_cost_usd) }}</div>
+      </div>
+    </div>
+
+    {% if r.summary %}
+    <details>
+      <summary>Why this plan</summary>
+      <p style="margin: 8px 0 0; font-size: 13px; color: var(--fg-muted);">{{ r.summary }}</p>
+    </details>
+    {% endif %}
+  </div>
+{% endfor %}
+</div>
+{% endblock %}

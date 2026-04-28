@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}NeevPath — recommend a deployment{% endblock %}
+
+{% block content %}
+{% if error %}
+  <div class="error">{{ error }}</div>
+{% endif %}
+
+<h2>Tell us what you want to serve</h2>
+<form method="post" action="/recommend" class="card">
+
+  <div class="row">
+    <label>
+      Model
+      <select name="model_id" required>
+        {% for m in choices.models %}
+          <option value="{{ m.id }}"
+            {% if submitted and submitted.model_id == m.id %}selected{% endif %}>
+            {{ m.label }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      Workload type
+      <select name="workload_type">
+        {% for w in choices.workloads %}
+          <option value="{{ w }}"
+            {% if submitted and submitted.workload_type == w %}selected{% endif %}>
+            {{ w }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      Optimize for
+      <select name="optimization_priority">
+        {% for p in choices.priorities %}
+          <option value="{{ p }}"
+            {% if submitted and submitted.optimization_priority == p %}selected{% endif %}>
+            {{ p }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <h2 style="margin-top: 24px;">Constraints (optional)</h2>
+  <div class="row">
+    <label>
+      Max p95 latency (ms)
+      <input type="number" name="max_p95_latency_ms" min="0" step="1"
+             placeholder="e.g. 250"
+             value="{% if submitted and submitted.constraints.max_p95_latency_ms %}{{ submitted.constraints.max_p95_latency_ms }}{% endif %}">
+    </label>
+    <label>
+      Min throughput (tokens/sec)
+      <input type="number" name="min_throughput_tps" min="0" step="1"
+             placeholder="e.g. 100"
+             value="{% if submitted and submitted.constraints.min_throughput_tps %}{{ submitted.constraints.min_throughput_tps }}{% endif %}">
+    </label>
+    <label>
+      Max monthly budget ($)
+      <input type="number" name="max_monthly_budget_usd" min="0" step="1"
+             placeholder="e.g. 1200"
+             value="{% if submitted and submitted.constraints.max_monthly_budget_usd %}{{ submitted.constraints.max_monthly_budget_usd }}{% endif %}">
+    </label>
+    <label>
+      Max VRAM (GB)
+      <input type="number" name="max_vram_gb" min="0" step="1"
+             placeholder="e.g. 80"
+             value="{% if submitted and submitted.constraints.max_vram_gb %}{{ submitted.constraints.max_vram_gb }}{% endif %}">
+    </label>
+    <label>
+      Min RPM
+      <input type="number" name="min_rpm" min="0" step="1"
+             placeholder="e.g. 500"
+             value="{% if submitted and submitted.constraints.min_rpm %}{{ submitted.constraints.min_rpm }}{% endif %}">
+    </label>
+  </div>
+
+  <h2 style="margin-top: 24px;">Preferences (optional)</h2>
+  <div class="row">
+    <label>
+      Prefer GPU
+      <select name="prefer_gpu">
+        <option value="">— no preference —</option>
+        {% for g in choices.gpus %}
+          <option value="{{ g.tier }}"
+            {% if submitted and submitted.prefer_gpu == g.tier %}selected{% endif %}>
+            {{ g.label }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Prefer backend
+      <select name="prefer_backend">
+        <option value="">— no preference —</option>
+        {% for b in choices.backends %}
+          <option value="{{ b }}"
+            {% if submitted and submitted.prefer_backend == b %}selected{% endif %}>
+            {{ b }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div style="margin-top: 16px;">
+    <button type="submit">Recommend deployment</button>
+  </div>
+</form>
+{% endblock %}

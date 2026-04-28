@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}NeevPath — compare deployments{% endblock %}
+
+{% block content %}
+{% if error %}
+  <div class="error">{{ error }}</div>
+{% endif %}
+
+<h2>Compare two or more models</h2>
+<p style="color: var(--fg-muted); font-size: 13px; margin: 0 0 16px;">
+  Same workload + constraints, different models. We run a recommendation per model and surface a side-by-side.
+</p>
+
+<form method="post" action="/compare" class="card">
+  <h2>Models (pick 2 to 4)</h2>
+  <div class="row">
+    {% for m in choices.models %}
+      <label style="flex-direction: row; align-items: center; gap: 8px; font-size: 14px; color: var(--fg);">
+        <input type="checkbox" name="model_ids" value="{{ m.id }}"
+          {% if submitted and m.id in submitted.model_ids %}checked{% endif %}>
+        {{ m.label }}
+      </label>
+    {% endfor %}
+  </div>
+
+  <h2 style="margin-top: 24px;">Workload</h2>
+  <div class="row">
+    <label>
+      Workload type
+      <select name="workload_type">
+        {% for w in choices.workloads %}
+          <option value="{{ w }}"
+            {% if submitted and submitted.workload_type == w %}selected{% endif %}>
+            {{ w }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Optimize for
+      <select name="optimization_priority">
+        {% for p in choices.priorities %}
+          <option value="{{ p }}"
+            {% if submitted and submitted.optimization_priority == p %}selected{% endif %}>
+            {{ p }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <h2 style="margin-top: 24px;">Constraints (optional)</h2>
+  <div class="row">
+    <label>
+      Max p95 latency (ms)
+      <input type="number" name="max_p95_latency_ms" min="0" step="1" placeholder="e.g. 250"
+             value="{% if submitted and submitted.constraints and submitted.constraints.max_p95_latency_ms %}{{ submitted.constraints.max_p95_latency_ms }}{% endif %}">
+    </label>
+    <label>
+      Min throughput (tokens/sec)
+      <input type="number" name="min_throughput_tps" min="0" step="1" placeholder="e.g. 100"
+             value="{% if submitted and submitted.constraints and submitted.constraints.min_throughput_tps %}{{ submitted.constraints.min_throughput_tps }}{% endif %}">
+    </label>
+    <label>
+      Max monthly budget ($)
+      <input type="number" name="max_monthly_budget_usd" min="0" step="1" placeholder="e.g. 1200"
+             value="{% if submitted and submitted.constraints and submitted.constraints.max_monthly_budget_usd %}{{ submitted.constraints.max_monthly_budget_usd }}{% endif %}">
+    </label>
+    <label>
+      Max VRAM (GB)
+      <input type="number" name="max_vram_gb" min="0" step="1" placeholder="e.g. 80"
+             value="{% if submitted and submitted.constraints and submitted.constraints.max_vram_gb %}{{ submitted.constraints.max_vram_gb }}{% endif %}">
+    </label>
+    <label>
+      Min RPM
+      <input type="number" name="min_rpm" min="0" step="1" placeholder="e.g. 500"
+             value="{% if submitted and submitted.constraints and submitted.constraints.min_rpm %}{{ submitted.constraints.min_rpm }}{% endif %}">
+    </label>
+  </div>
+
+  <div style="margin-top: 16px;">
+    <button type="submit">Compare</button>
+  </div>
+</form>
+{% endblock %}
