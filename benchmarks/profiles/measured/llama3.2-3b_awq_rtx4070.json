@@ -1,0 +1,19 @@
+[
+  {
+    "model_id": "llama3.2-3b",
+    "gpu_tier": "rtx4070",
+    "backend": "vllm",
+    "quantization": "awq",
+    "ttft_ms_p50": 111.6,
+    "ttft_ms_p95": 122.5,
+    "itl_ms_p50": 8.0,
+    "itl_ms_p95": 8.7,
+    "tokens_per_sec": 113.0,
+    "max_concurrent_requests": 1,
+    "throughput_at_max_concurrency_tps": 113.0,
+    "vram_usage_gb": 11.64,
+    "hourly_cost_usd": 0.0,
+    "source": "measured",
+    "notes": "Measured on NVIDIA GeForce RTX 4070. 20 requests, 2497 total tokens."
+  }
+]

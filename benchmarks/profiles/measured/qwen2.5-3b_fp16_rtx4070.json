@@ -1,0 +1,19 @@
+[
+  {
+    "model_id": "qwen2.5-3b",
+    "gpu_tier": "rtx4070",
+    "backend": "vllm",
+    "quantization": "fp16",
+    "ttft_ms_p50": 192.9,
+    "ttft_ms_p95": 195.0,
+    "itl_ms_p50": 13.7,
+    "itl_ms_p95": 13.8,
+    "tokens_per_sec": 66.4,
+    "max_concurrent_requests": 1,
+    "throughput_at_max_concurrency_tps": 66.4,
+    "vram_usage_gb": 11.64,
+    "hourly_cost_usd": 0.0,
+    "source": "measured",
+    "notes": "Measured on NVIDIA GeForce RTX 4070. 25 requests, 2948 total tokens."
+  }
+]
