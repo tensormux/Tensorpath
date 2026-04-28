@@ -57,3 +57,6 @@ logs/
 # Temporary
 tmp/
 temp/
+
+# Project planning
+CLAUDE.md
