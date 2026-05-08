@@ -60,3 +60,14 @@ temp/
 
 # Project planning
 CLAUDE.md
+
+# Node / npm — kernel-skills lives in node_modules, never commit it
+node_modules/
+
+# Forge run artifacts — generated content, not source. Keep the dir, drop the runs.
+forge_runs/*
+!forge_runs/.gitkeep
+
+# Local-only directories
+.venv-bench/
+.claude/
