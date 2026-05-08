@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Forge run — {{ run.run_id }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 16px;">
+  <a href="/forge" style="text-decoration: none; color: var(--accent); font-size: 13px;">&larr; All runs</a>
+</div>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if notice %}<div class="summary">{{ notice }}</div>{% endif %}
+
+<h2>{{ run.run_id }}</h2>
+<p style="color: var(--fg-muted); font-size: 13px; margin: 0 0 16px;">
+  <strong>{{ run.task.op.value if run.task.op.value else run.task.op }}</strong>
+  &middot; {{ run.task.language.value if run.task.language.value else run.task.language }}
+  &middot; {{ run.task.target_gpu }}
+  &middot; {{ run.task.dtype }}
+  &middot; objective: {{ run.task.objective }}
+  &middot; status: <strong>{{ run.status.value if run.status.value else run.status }}</strong>
+</p>
+
+<div class="card">
+  <h2>Skills retrieved</h2>
+  {% if run.skill_ids %}
+  <ul style="margin: 8px 0 0; padding-left: 20px; font-size: 13px;">
+    {% for s in run.skill_ids %}
+      <li><code>{{ s }}</code></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p style="color: var(--fg-muted); font-size: 13px; margin: 8px 0 0;">No external skills retrieved &mdash; fallback guidance was written.</p>
+  {% endif %}
+  <p style="margin: 12px 0 0; font-size: 13px;">
+    <a href="/api/forge/runs/{{ run.run_id }}/prompt" style="color: var(--accent);">View agent prompt &rarr;</a>
+  </p>
+</div>
+
+<div class="card">
+  <h2>Candidate</h2>
+  {% if candidate_present %}
+    <p style="margin: 0; font-size: 13px;">Candidate files present at <code>{{ run.artifact_dir }}/candidate/</code>.</p>
+  {% else %}
+    <p style="margin: 0; font-size: 13px; color: var(--fg-muted);">
+      Candidate not yet placed. Drop the agent's output (kernel.py, reference.py, test_correctness.py, bench.py, metadata.json) into <code>{{ run.artifact_dir }}/candidate/</code>.
+    </p>
+  {% endif %}
+</div>
+
+<h2 style="margin-top: 24px;">Pipeline</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title" style="font-size: 15px;">1. Verify</div>
+      {% if verification_report %}
+        <span class="badge {% if verification_report.passed %}badge-source-measured{% else %}badge-source-estimated{% endif %}">
+          {{ "passed" if verification_report.passed else "rejected" }}
+        </span>
+      {% endif %}
+    </div>
+    <p style="font-size: 13px; color: var(--fg-muted); margin: 0 0 12px;">
+      Required-files check, metadata sanity, unsafe-pattern scan, and pytest on <code>test_correctness.py</code>.
+    </p>
+    {% if verification_report and verification_report.failure_reason %}
+      <pre style="font-size: 11px; max-height: 180px; overflow-y: auto;">{{ verification_report.failure_reason }}</pre>
+    {% endif %}
+    <form method="post" action="/forge/runs/{{ run.run_id }}/verify" style="margin: 0;">
+      <label style="flex-direction: row; align-items: center; gap: 8px; font-size: 12px; color: var(--fg-muted); margin-bottom: 8px;">
+        <input type="checkbox" name="skip_cuda_check" value="1">
+        Skip CUDA-required gate (test infra only)
+      </label>
+      <button type="submit"{% if not candidate_present %} disabled style="opacity: 0.5;"{% endif %}>Run verify</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title" style="font-size: 15px;">2. Benchmark</div>
+      {% if benchmark_report %}
+        <span class="badge {% if benchmark_report.passed %}badge-source-measured{% else %}badge-source-estimated{% endif %}">
+          {{ "passed" if benchmark_report.passed else "rejected" }}
+        </span>
+      {% endif %}
+    </div>
+    <p style="font-size: 13px; color: var(--fg-muted); margin: 0 0 12px;">
+      Runs <code>candidate/bench.py</code>, parses the JSON report, and applies the 1.10x speedup threshold.
+    </p>
+    {% if benchmark_report and benchmark_report.baseline_latency_us %}
+      <div class="stat-grid" style="margin-bottom: 8px;">
+        <div>
+          <div class="stat-label">baseline</div>
+          <div class="stat-value">{{ "%.1f"|format(benchmark_report.baseline_latency_us) }} us</div>
+        </div>
+        <div>
+          <div class="stat-label">candidate</div>
+          <div class="stat-value">{{ "%.1f"|format(benchmark_report.candidate_latency_us) }} us</div>
+        </div>
+        <div>
+          <div class="stat-label">speedup</div>
+          <div class="stat-value">{{ "%.2f"|format(benchmark_report.speedup) }}x</div>
+        </div>
+      </div>
+    {% endif %}
+    {% if benchmark_report and benchmark_report.notes %}
+      <p style="font-size: 12px; color: var(--fg-muted); margin: 0 0 8px;">{{ benchmark_report.notes }}</p>
+    {% endif %}
+    <form method="post" action="/forge/runs/{{ run.run_id }}/benchmark" style="margin: 0;">
+      <button type="submit"{% if not (verification_report and verification_report.passed) %} disabled style="opacity: 0.5;"{% endif %}>Run benchmark</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title" style="font-size: 15px;">3. Promote</div>
+      {% if promotion %}
+        <span class="badge badge-source-measured">promoted</span>
+      {% endif %}
+    </div>
+    <p style="font-size: 13px; color: var(--fg-muted); margin: 0 0 12px;">
+      Copies <code>kernel.py</code> into the verified registry and records the speedup with op-level evidence.
+    </p>
+    {% if promotion %}
+      <p style="font-size: 13px; margin: 0 0 8px;">
+        <code>{{ promotion.kernel_id }}</code><br>
+        <span style="color: var(--fg-muted); font-size: 12px;">→ {{ promotion.source_path }}</span>
+      </p>
+    {% endif %}
+    <form method="post" action="/forge/runs/{{ run.run_id }}/promote" style="margin: 0;">
+      <button type="submit"{% if not (benchmark_report and benchmark_report.passed) %} disabled style="opacity: 0.5;"{% endif %}>Promote</button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

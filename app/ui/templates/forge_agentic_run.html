@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}Agentic Forge run — {{ run.run_id }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 16px;">
+  <a href="/forge" style="text-decoration: none; color: var(--accent); font-size: 13px;">&larr; All runs</a>
+</div>
+
+<h2>Agentic run: {{ run.run_id }}</h2>
+<p style="color: var(--fg-muted); font-size: 13px; margin: 0 0 16px;">
+  <strong>{{ run.task.op.value if run.task.op.value else run.task.op }}</strong>
+  &middot; {{ run.task.language.value if run.task.language.value else run.task.language }}
+  &middot; {{ run.task.target_gpu }}
+  &middot; {{ run.task.dtype }}
+  &middot; objective: {{ run.task.objective }}
+</p>
+
+<div id="status-banner" class="summary">
+  Loading status&hellip;
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px;">
+  <div class="card" style="padding: 14px;">
+    <div class="stat-label">Iteration</div>
+    <div class="stat-value"><span id="iter-current">&mdash;</span> / <span id="iter-max">&mdash;</span></div>
+  </div>
+  <div class="card" style="padding: 14px;">
+    <div class="stat-label">Cost</div>
+    <div class="stat-value">$<span id="cost-current">0.00</span></div>
+    <div class="alt-meta">cap: $<span id="cost-cap">&mdash;</span></div>
+  </div>
+  <div class="card" style="padding: 14px;">
+    <div class="stat-label">Verify</div>
+    <div class="stat-value" id="verify-status">&mdash;</div>
+  </div>
+  <div class="card" style="padding: 14px;">
+    <div class="stat-label">Benchmark</div>
+    <div class="stat-value" id="bench-status">&mdash;</div>
+    <div class="alt-meta"><span id="bench-speedup">&mdash;</span></div>
+  </div>
+</div>
+
+<div style="display: flex; gap: 12px; margin-bottom: 16px;">
+  <button id="abort-btn" type="button" class="secondary">Abort run</button>
+  <a id="manual-link" href="/forge/runs/{{ run.run_id }}" class="secondary"
+     style="text-decoration: none; padding: 10px 20px; display: inline-block; border-radius: 4px;">
+    View as manual run
+  </a>
+</div>
+
+<h2>Token usage</h2>
+<div class="card" style="margin-bottom: 24px;">
+  <div class="stat-grid">
+    <div>
+      <div class="stat-label">Input</div>
+      <div class="stat-value"><span id="tok-input">0</span></div>
+    </div>
+    <div>
+      <div class="stat-label">Output</div>
+      <div class="stat-value"><span id="tok-output">0</span></div>
+    </div>
+    <div>
+      <div class="stat-label">Cache write</div>
+      <div class="stat-value"><span id="tok-cache-write">0</span></div>
+    </div>
+    <div>
+      <div class="stat-label">Cache read</div>
+      <div class="stat-value"><span id="tok-cache-read">0</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>Live transcript</h2>
+<div class="card" style="padding: 0;">
+  <pre id="transcript" style="margin: 0; padding: 16px; max-height: 480px; overflow-y: auto; font-size: 11px; line-height: 1.5;">(waiting for events&hellip;)</pre>
+</div>
+
+<script>
+const RUN_ID = {{ run.run_id|tojson }};
+const POLL_INTERVAL_MS = 2000;
+const TERMINAL_STATUSES = new Set(["succeeded", "rejected", "aborted", "errored"]);
+
+const fmt = (n) => Number(n || 0).toLocaleString();
+const fmtCost = (n) => (Number(n || 0)).toFixed(2);
+
+let pollHandle = null;
+let lastTranscriptCount = 0;
+
+function statusBadgeColor(status) {
+  return {
+    "pending":  "var(--imported)",
+    "running":  "var(--accent)",
+    "succeeded":"var(--measured)",
+    "rejected": "var(--estimated)",
+    "aborted":  "var(--estimated)",
+    "errored":  "var(--estimated)",
+  }[status] || "var(--imported)";
+}
+
+async function refresh() {
+  try {
+    const resp = await fetch(`/api/forge/runs/${RUN_ID}/agentic`);
+    if (!resp.ok) {
+      document.getElementById("status-banner").textContent = `Status fetch failed (${resp.status})`;
+      return;
+    }
+    const state = await resp.json();
+    if (!state) {
+      document.getElementById("status-banner").textContent = "No agentic state yet — orchestrator may not be running.";
+      return;
+    }
+
+    const banner = document.getElementById("status-banner");
+    banner.style.background = "var(--accent-soft)";
+    banner.style.borderLeft = `3px solid ${statusBadgeColor(state.status)}`;
+    banner.innerHTML = `<strong>Status:</strong> ${state.status}` +
+      (state.last_message ? `<br>${state.last_message}` : "") +
+      (state.error ? `<br><span style="color: #831515;">${state.error}</span>` : "") +
+      (state.promoted_kernel_id ? `<br><strong>Promoted:</strong> <code>${state.promoted_kernel_id}</code>` : "");
+
+    document.getElementById("iter-current").textContent = state.iteration ?? 0;
+    document.getElementById("iter-max").textContent = state.max_iterations ?? 0;
+    document.getElementById("cost-current").textContent = fmtCost(state.cost_usd);
+    document.getElementById("cost-cap").textContent = fmtCost(state.cost_cap_usd);
+
+    document.getElementById("verify-status").textContent =
+      state.last_verify_passed === null || state.last_verify_passed === undefined
+        ? "—"
+        : (state.last_verify_passed ? "passed" : "rejected");
+
+    document.getElementById("bench-status").textContent =
+      state.last_benchmark_passed === null || state.last_benchmark_passed === undefined
+        ? "—"
+        : (state.last_benchmark_passed ? "passed" : "rejected");
+
+    document.getElementById("bench-speedup").textContent =
+      state.last_speedup ? `${Number(state.last_speedup).toFixed(2)}x` : "";
+
+    document.getElementById("tok-input").textContent = fmt(state.input_tokens_total);
+    document.getElementById("tok-output").textContent = fmt(state.output_tokens_total);
+    document.getElementById("tok-cache-write").textContent = fmt(state.cache_write_tokens_total);
+    document.getElementById("tok-cache-read").textContent = fmt(state.cache_read_tokens_total);
+
+    if (state.transcript_lines !== lastTranscriptCount) {
+      lastTranscriptCount = state.transcript_lines;
+      const tResp = await fetch(`/api/forge/runs/${RUN_ID}/agentic/transcript?tail=200`);
+      if (tResp.ok) {
+        const t = await tResp.json();
+        const lines = t.entries.map(e => {
+          if (e.kind === "model_turn") {
+            return `[${e.at}] iter ${e.iteration}  stop=${e.stop_reason}  ` +
+                   `tokens=${e.tokens.input_tokens}+${e.tokens.output_tokens} (cw=${e.tokens.cache_write_tokens}, cr=${e.tokens.cache_read_tokens})  ` +
+                   `cost=$${e.turn_cost_usd}  cum=$${e.cumulative_cost_usd}`;
+          }
+          if (e.kind === "tool_call") {
+            const head = `[${e.at}] tool ${e.name}` + (e.is_error ? "  ERROR" : "");
+            const inputStr = JSON.stringify(e.input).slice(0, 120);
+            const preview = (e.content_preview || "").replace(/\s+/g, " ").slice(0, 120);
+            return `${head}  in=${inputStr}\n              out=${preview}`;
+          }
+          if (e.kind === "promotion") {
+            return `[${e.at}] PROMOTED  ${e.kernel_id}  speedup=${e.speedup}x`;
+          }
+          return `[${e.at}] ${JSON.stringify(e)}`;
+        });
+        document.getElementById("transcript").textContent = lines.join("\n") || "(waiting for events…)";
+        const pre = document.getElementById("transcript");
+        pre.scrollTop = pre.scrollHeight;
+      }
+    }
+
+    if (TERMINAL_STATUSES.has(state.status)) {
+      if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
+      document.getElementById("abort-btn").disabled = true;
+      document.getElementById("abort-btn").style.opacity = "0.5";
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+document.getElementById("abort-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("abort-btn");
+  btn.disabled = true;
+  try {
+    const resp = await fetch(`/api/forge/runs/${RUN_ID}/agentic/abort`, {method: "POST"});
+    if (!resp.ok) {
+      const detail = await resp.text();
+      alert(`Abort failed: ${detail}`);
+      btn.disabled = false;
+    }
+  } catch (e) {
+    alert("Abort request failed: " + e);
+    btn.disabled = false;
+  }
+});
+
+refresh();
+pollHandle = setInterval(refresh, POLL_INTERVAL_MS);
+</script>
+{% endblock %}

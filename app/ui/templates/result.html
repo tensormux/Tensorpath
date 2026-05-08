@@ -73,6 +73,43 @@
 
 {{ plan_card(result.recommended, recommended=True) }}
 
+<h2 style="margin-top: 32px;">Kernel optimization status</h2>
+<div class="card">
+{% if result.recommended.kernel_optimizations %}
+  <p style="margin: 0 0 12px; font-size: 13px; color: var(--fg-muted);">
+    Verified op-level kernel{{ "s" if result.recommended.kernel_optimizations|length > 1 else "" }} found in the registry for this GPU + dtype.
+    Shown as opportunities only — op-level microbenchmark speedup is not propagated into the
+    end-to-end latency/cost numbers above.
+  </p>
+  {% for ko in result.recommended.kernel_optimizations %}
+    <div style="border-left: 3px solid var(--accent); padding: 10px 14px; margin-bottom: 10px; background: var(--accent-soft); border-radius: 0 4px 4px 0;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px;">
+        <div>
+          <strong>{{ ko.op }}</strong>
+          {% if ko.kernel_id %}<br><span style="font-family: monospace; font-size: 11px; color: var(--fg-muted);">{{ ko.kernel_id }}</span>{% endif %}
+        </div>
+        <div style="text-align: right;">
+          {% if ko.speedup %}<div class="stat-value">{{ "%.2f"|format(ko.speedup) }}x</div>{% endif %}
+          <span class="badge badge-source-measured">{{ ko.evidence_level or "op_level" }}</span>
+        </div>
+      </div>
+      <div style="font-size: 12px; color: var(--fg-muted); margin-top: 6px;">
+        Used in scoring: <strong>{{ "yes" if ko.applied else "no, shown as opportunity only" }}</strong>
+        {% if ko.benchmark_scope %} &middot; Scope: {{ ko.benchmark_scope }}{% endif %}
+      </div>
+      {% if ko.notes %}
+        <div style="font-size: 12px; color: var(--fg-muted); margin-top: 4px;">{{ ko.notes }}</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% else %}
+  <p style="margin: 0; font-size: 13px; color: var(--fg-muted);">
+    No verified kernel optimization available for this GPU + dtype. Visit
+    <a href="/forge" style="color: var(--accent);">Forge</a> to create one.
+  </p>
+{% endif %}
+</div>
+
 {% if result.alternatives %}
   <h2 style="margin-top: 32px;">Alternatives</h2>
   {% for alt in result.alternatives %}

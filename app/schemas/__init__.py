@@ -15,6 +15,7 @@ from app.schemas.deployment import (
     ComparisonRequest,
     ComparisonResponse,
     ComparisonHighlight,
+    KernelOptimizationMetadata,
 )
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "RecommendationRequest",
     "DeploymentPlan", "PlanScores", "RecommendationResponse", "DeploymentConfig",
     "ComparisonRequest", "ComparisonResponse", "ComparisonHighlight",
+    "KernelOptimizationMetadata",
 ]

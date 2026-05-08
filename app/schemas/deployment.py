@@ -22,6 +22,26 @@ class PlanScores(BaseModel):
     meets_vram: bool | None = None
 
 
+class KernelOptimizationMetadata(BaseModel):
+    """Annotation about an op-level kernel optimization that may apply to a plan.
+
+    `applied=False` is the safe default: a verified op-level kernel exists in the
+    registry, but its measured speedup is a microbenchmark and we do NOT propagate
+    that into the plan's end-to-end latency/throughput/cost numbers. Only
+    runtime-level or endpoint-level evidence may change those estimates, which
+    will live on follow-up versions of this metadata.
+    """
+
+    applied: bool = False
+    available: bool = False
+    kernel_id: str | None = None
+    op: str | None = None
+    speedup: float | None = None
+    evidence_level: str | None = None
+    benchmark_scope: str | None = None
+    notes: str | None = None
+
+
 class DeploymentPlan(BaseModel):
     rank: int
     model_id: str
@@ -44,6 +64,9 @@ class DeploymentPlan(BaseModel):
     # flags
     is_recommended: bool = False
     is_over_provisioned: bool = False
+
+    # kernel-level optimizations from the verified registry (op-level only for v0)
+    kernel_optimizations: list[KernelOptimizationMetadata] = Field(default_factory=list)
 
 
 class RecommendationResponse(BaseModel):

@@ -10,8 +10,12 @@ from app.schemas import (
     DeploymentConfig,
     WorkloadType,
 )
+from pathlib import Path
+
 from app.services.benchmark_store import BenchmarkStore
 from app.services.deployment import export_config
+from app.services.forge.registry import KernelRegistry
+from app.services.optimization import KernelRegistryPass
 from app.services.recommender import RecommendationEngine
 from app.services.runtime_registry import RuntimeRegistry
 
@@ -21,9 +25,12 @@ router = APIRouter(prefix="/api")
 # init services once at import time
 _benchmark_store = BenchmarkStore()
 _registry = RuntimeRegistry()
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_kernel_registry = KernelRegistry(repo_root=_REPO_ROOT)
 _engine = RecommendationEngine(
     benchmark_store=_benchmark_store,
     registry=_registry,
+    optimization_passes=[KernelRegistryPass(_kernel_registry)],
 )
 
 

@@ -14,6 +14,7 @@ from app.schemas import (
 )
 from app.services.benchmark_store import BenchmarkStore
 from app.services.explanation import explain_plan, explain_recommendation
+from app.services.optimization.passes import OptimizationPass
 from app.services.recommender.candidates import generate_candidates
 from app.services.recommender.scoring import score_candidate
 from app.services.runtime_registry import RuntimeRegistry
@@ -24,9 +25,12 @@ class RecommendationEngine:
         self,
         benchmark_store: BenchmarkStore,
         registry: RuntimeRegistry,
+        optimization_passes: list[OptimizationPass] | None = None,
     ):
         self.benchmark_store = benchmark_store
         self.registry = registry
+        # Passes annotate plans after scoring; never change ranking.
+        self.optimization_passes: list[OptimizationPass] = optimization_passes or []
 
     def recommend(self, request: RecommendationRequest) -> RecommendationResponse:
         model = MODEL_REGISTRY.get(request.model_id)
@@ -124,6 +128,16 @@ class RecommendationEngine:
                 is_over_provisioned=is_over_provisioned,
             )
             plans.append(plan)
+
+        # Run annotation passes after scoring — passes can attach metadata but
+        # must not change ranking. We apply them in declaration order.
+        if self.optimization_passes:
+            annotated: list[DeploymentPlan] = []
+            for p in plans:
+                for opt_pass in self.optimization_passes:
+                    p = opt_pass.apply(p)
+                annotated.append(p)
+            plans = annotated
 
         recommended = plans[0]
         alternatives = plans[1:]

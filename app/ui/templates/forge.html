@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}NeevPath — Forge kernel optimization{% endblock %}
+
+{% block content %}
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if notice %}<div class="summary">{{ notice }}</div>{% endif %}
+
+<h2>Forge — kernel optimization runs</h2>
+<p style="color: var(--fg-muted); font-size: 13px; margin: 0 0 16px;">
+  Forge retrieves expert kernel-skills guidance, builds a strict agent-ready prompt,
+  and validates candidate kernels with correctness + benchmark gates before they enter
+  the verified registry. Generated code never executes here unless verification passes.
+</p>
+
+<form method="post" action="/forge/runs" class="card">
+  <h2>Create a Forge run</h2>
+  <div class="row">
+    <label>
+      Operation
+      <select name="op" required>
+        {% for op in choices.ops %}
+          <option value="{{ op }}">{{ op }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Language
+      <select name="language">
+        {% for lang in choices.languages %}
+          <option value="{{ lang }}">{{ lang }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Target GPU
+      <input type="text" name="target_gpu" required placeholder='e.g. "RTX 4070" or "H100"'>
+    </label>
+    <label>
+      dtype
+      <select name="dtype">
+        {% for d in choices.dtypes %}
+          <option value="{{ d }}"{% if d == 'fp16' %} selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <div class="row">
+    <label>
+      batch
+      <input type="number" name="batch" min="0" step="1" placeholder="e.g. 16">
+    </label>
+    <label>
+      hidden_size
+      <input type="number" name="hidden_size" min="0" step="1" placeholder="e.g. 4096">
+    </label>
+    <label>
+      Objective
+      <select name="objective">
+        {% for o in choices.objectives %}
+          <option value="{{ o }}"{% if o == 'latency' %} selected{% endif %}>{{ o }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <h2 style="margin-top: 24px;">Mode</h2>
+  <div class="card" style="background: var(--accent-soft); border-color: var(--accent); padding: 16px;">
+    <label style="flex-direction: row; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--fg);">
+      <input type="checkbox" name="autonomous" value="1" style="margin-top: 3px;">
+      <div>
+        <div><strong>Autonomous (agentic)</strong> &mdash; Claude Opus 4.7 writes the kernel, runs verify + benchmark, and the orchestrator promotes on success.</div>
+        <div style="color: var(--fg-muted); font-size: 12px; margin-top: 4px;">
+          Requires <code>ANTHROPIC_API_KEY</code> in <code>.env</code>. Typical run: $0.30&ndash;$1.50, 2&ndash;5 minutes. Cost-capped per-run.
+        </div>
+      </div>
+    </label>
+    <div class="row" style="margin-top: 12px; margin-bottom: 0;">
+      <label>
+        Max iterations
+        <input type="number" name="max_iterations" min="1" max="20" step="1" value="5">
+      </label>
+      <label>
+        Cost cap (USD)
+        <input type="number" name="cost_cap_usd" min="0" step="0.5" value="3">
+      </label>
+      <label style="flex-direction: row; align-items: center; gap: 8px; font-size: 12px;">
+        <input type="checkbox" name="skip_cuda_check" value="1">
+        Skip CUDA-required gate (no GPU)
+      </label>
+    </div>
+  </div>
+
+  <div style="margin-top: 12px;">
+    <button type="submit">Create run</button>
+    <span style="font-size: 12px; color: var(--fg-muted); margin-left: 12px;">
+      Without autonomous: writes the prompt and waits for you to drop in candidate files.
+    </span>
+  </div>
+</form>
+
+<h2 style="margin-top: 24px;">Recent runs</h2>
+{% if runs %}
+<div class="card" style="padding: 0;">
+  <table style="width:100%; border-collapse: collapse; font-size: 13px;">
+    <thead>
+      <tr style="text-align: left; color: var(--fg-muted); border-bottom: 1px solid var(--border);">
+        <th style="padding: 12px 16px;">Run</th>
+        <th style="padding: 12px 16px;">Op</th>
+        <th style="padding: 12px 16px;">GPU</th>
+        <th style="padding: 12px 16px;">dtype</th>
+        <th style="padding: 12px 16px;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in runs %}
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding: 10px 16px;">
+          <a href="/forge/runs/{{ r.run_id }}" style="color: var(--accent); text-decoration: none; font-family: monospace; font-size: 12px;">{{ r.run_id }}</a>
+        </td>
+        <td style="padding: 10px 16px;">{{ r.task.op.value if r.task.op.value else r.task.op }}</td>
+        <td style="padding: 10px 16px;">{{ r.task.target_gpu }}</td>
+        <td style="padding: 10px 16px;">{{ r.task.dtype }}</td>
+        <td style="padding: 10px 16px;">
+          <span class="badge badge-source-{{ 'measured' if r.status.value == 'promoted' else ('estimated' if r.status.value == 'rejected' else 'imported') }}">
+            {{ r.status.value if r.status.value else r.status }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card"><em style="color: var(--fg-muted);">No runs yet — fill in the form above to start one.</em></div>
+{% endif %}
+
+<h2 style="margin-top: 24px;">Verified kernel registry</h2>
+{% if kernels %}
+<div class="card" style="padding: 0;">
+  <table style="width:100%; border-collapse: collapse; font-size: 13px;">
+    <thead>
+      <tr style="text-align: left; color: var(--fg-muted); border-bottom: 1px solid var(--border);">
+        <th style="padding: 12px 16px;">Kernel ID</th>
+        <th style="padding: 12px 16px;">Op</th>
+        <th style="padding: 12px 16px;">GPU</th>
+        <th style="padding: 12px 16px;">Speedup</th>
+        <th style="padding: 12px 16px;">Evidence</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for k in kernels %}
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding: 10px 16px; font-family: monospace; font-size: 12px;">{{ k.kernel_id }}</td>
+        <td style="padding: 10px 16px;">{{ k.op }}</td>
+        <td style="padding: 10px 16px;">{{ k.target_gpu }}</td>
+        <td style="padding: 10px 16px; font-variant-numeric: tabular-nums;">
+          {% if k.benchmark and k.benchmark.speedup %}{{ "%.2f"|format(k.benchmark.speedup) }}x{% else %}—{% endif %}
+        </td>
+        <td style="padding: 10px 16px;"><span class="badge badge-source-measured">{{ k.evidence_level }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card"><em style="color: var(--fg-muted);">No verified kernels yet. Promote a Forge run to see it here.</em></div>
+{% endif %}
+{% endblock %}
