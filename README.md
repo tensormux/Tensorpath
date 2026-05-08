@@ -1,91 +1,143 @@
 # NeevPath — Inference Optimizer for NeevCloud
 
-NeevCloud gives you GPUs. This tells you the best way to use them.
+NeevCloud gives you GPUs. NeevPath tells you the best way to use them.
 
-You give it a model, a workload type, and what you care about (latency, throughput, cost).
-It gives you back the best GPU + backend + quantization combo, with numbers to back it up,
-and a deployment config you can actually use.
+You give it a model, a workload, and what you care about (latency, throughput, cost). It picks the best GPU + backend + quantization combo, explains why, and hands you a deployment-ready config. NeevPath also has a kernel optimization layer (Forge) that can autonomously generate and verify faster Triton kernels for specific GPU + dtype + shape combinations and surface them on recommendation results.
 
-## what it does
+## What it does
 
-- takes model name + workload constraints as input
-- generates candidate deployment plans (GPU x backend x quantization)
-- scores and ranks them based on real benchmark data
-- explains why the top pick won
-- exports a deployment-ready config for NeevCloud
+**Recommender** — turns workload intent into an optimized deployment plan
+- Generates candidate plans (GPU × backend × quantization) for a model
+- Filters out anything that won't fit in VRAM or beats your budget
+- Scores each on five dimensions: latency, throughput, cost, quality, simplicity
+- Ranks them, explains the top pick, exports a deployment artifact
+- Compares plans across models (`/compare`)
 
-## quick start
+**Forge** — verified kernel optimization layer
+- Retrieves expert playbooks from `@krxgu/kernel-skills` (npm)
+- Either generates an agent-ready prompt for you to use elsewhere (manual mode)
+- Or runs an autonomous loop with Claude Opus 4.7 that writes the kernel itself (agentic mode)
+- Validates correctness with pytest against a PyTorch reference, benchmarks against baseline, refuses to promote anything below 1.10× speedup
+- Verified kernels land in a registry that the recommender annotates onto plan results
+
+## Quick start
 
 ```bash
-# python 3.11+ required
+# python 3.11+
 pip install -r requirements.txt
 
-# install kernel-skills (Node 18+ required for Forge)
+# Node 18+ for kernel-skills (via npm)
 bash scripts/install_kernel_skills.sh
 
-# run the API server
-python -m uvicorn app.main:app --reload --port 8000
+# (optional, for agentic Forge) drop your Anthropic key in .env
+cp .env.example .env
+# edit .env and paste your sk-ant-api03-...
 
-# hit the recommend endpoint
-curl -X POST http://localhost:8000/api/recommend \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model_id": "qwen2.5-7b",
-    "workload_type": "chat",
-    "optimization_priority": "cost",
-    "constraints": {
-      "max_p95_latency_ms": 250,
-      "max_monthly_budget_usd": 300
-    }
-  }'
+# run the server
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
-## project structure
+Then visit http://localhost:8000/
+
+## Three ways to use it
+
+### 1. Web UI
+| URL | What |
+|---|---|
+| `/` | Recommendation form |
+| `/compare` | Side-by-side comparison across models |
+| `/forge` | Kernel optimization runs + verified-kernel registry |
+| `/forge/runs/<id>/agentic` | Live dashboard for an autonomous Forge run |
+
+### 2. JSON API
+```bash
+# recommend
+curl -X POST http://localhost:8000/api/recommend \
+  -H 'Content-Type: application/json' \
+  -d '{"model_id":"qwen2.5-7b","workload_type":"chat","optimization_priority":"cost","constraints":{"max_p95_latency_ms":250,"max_monthly_budget_usd":300}}'
+
+# compare two models
+curl -X POST http://localhost:8000/api/compare \
+  -H 'Content-Type: application/json' \
+  -d '{"model_ids":["qwen2.5-7b","llama3.2-3b"],"workload_type":"chat","optimization_priority":"balanced"}'
+
+# kick off an autonomous Forge run
+curl -X POST http://localhost:8000/api/forge/runs \
+  -H 'Content-Type: application/json' \
+  -d '{"op":"rmsnorm","language":"triton","target_gpu":"RTX 4070","dtype":"fp16","shape":{"batch":16,"hidden_size":4096}}'
+# then start the agent against the returned run_id:
+curl -X POST http://localhost:8000/api/forge/runs/<run_id>/agentic \
+  -d '{"max_iterations":5,"cost_cap_usd":3.0}'
+```
+
+OpenAPI docs at `/docs`.
+
+### 3. CLI
+```bash
+# Forge from the terminal (no server required)
+python scripts/forge.py create --op rmsnorm --language triton \
+    --gpu "RTX 4070" --dtype fp16 --batch 16 --hidden-size 4096
+python scripts/forge.py verify    --run-id <run_id>
+python scripts/forge.py benchmark --run-id <run_id>
+python scripts/forge.py promote   --run-id <run_id>
+python scripts/forge.py list-kernels
+
+# tiny smoke-test of the recommender (no server)
+python scripts/demo.py
+```
+
+## Project structure
 
 ```
 app/
-  api/           -> FastAPI routes
-  schemas/       -> pydantic models for everything
+  api/             FastAPI routes (/api/* + /api/forge/*)
+  ui/              Jinja templates + UI handlers
+  schemas/         pydantic data contracts
   services/
-    recommender/       -> candidate generation + scoring + ranking
-    benchmark_store/   -> loads and queries benchmark profiles
-    runtime_registry/  -> what backends support what
-    deployment/        -> config export / deploy adapter
-    explanation/       -> why we picked what we picked
+    recommender/         candidate generation + scoring + ranking
+    benchmark_store/     loads + queries benchmark profiles
+    runtime_registry/    backend capabilities (vLLM, TensorRT-LLM)
+    deployment/          DeploymentConfig export
+    explanation/         "why this plan won" text
+    optimization/        plan-annotation passes (KernelRegistryPass)
+    forge/               kernel-skills, prompt builder, gates, agentic loop
+  kernels/triton/        verified kernel source files
 benchmarks/
-  profiles/      -> benchmark data (JSON) per model
-tests/           -> scoring, ranking, constraint, explanation tests
+  profiles/        benchmark JSON (priors + measured)
+  runners/         vLLM-driven measurement tool
+  kernels/         shared bench utils (warmup, CUDA sync, percentiles)
+kernel_registry/   verified_kernels.json (the source of truth)
+forge_runs/        per-run artifacts (gitignored except .gitkeep)
+docs/              FORGE.md, KERNEL_REGISTRY.md, BENCHMARKING.md, CLAIMS.md
+scripts/           forge CLI + demo
+tests/             93 unit tests + 1 opt-in integration test
 ```
 
-## supported surface (mvp)
+## Supported surface (MVP)
 
-**models:** Qwen 2.5 7B, Llama 3.1 8B, Llama 3.2 3B
-**GPUs:** L4, L40S, A100-80GB, H100
+**models:** Qwen 2.5 7B, Qwen 2.5 3B, Llama 3.1 8B, Llama 3.2 3B
+**GPUs:** L4, L40S, A100-80GB, H100 (datacenter); RTX 4070 (local for measured profiles)
 **backends:** vLLM, TensorRT-LLM
-**quantizations:** FP16, FP8, AWQ 4-bit, GPTQ 4-bit
+**quantizations:** FP16, BF16, FP8, AWQ 4-bit, GPTQ 4-bit
 **priorities:** latency, throughput, cost, balanced
 
-## how scoring works
+## How scoring works
 
-each candidate plan gets scored on five dimensions:
-1. **latency** — how close to target (or how fast absolutely)
-2. **throughput** — tokens/sec and whether it meets RPM targets
-3. **cost** — hourly rate relative to budget
-4. **quality** — quantization degradation penalty
-5. **simplicity** — operational complexity of the backend
+Each candidate is scored on five dimensions:
 
-weights shift depending on what the user optimizes for.
-hard constraints (budget cap, latency ceiling, VRAM limit) filter candidates before scoring.
+1. **latency** — relative to the candidate set; bonus for headroom under user target, penalty proportional to overshoot
+2. **throughput** — tokens/sec, plus a hard penalty if `min_throughput_tps` not met
+3. **cost** — hourly rate; bonus when comfortably under budget, heavy penalty when over
+4. **quality** — quantization degradation (FP16=1.00, FP8=0.96, AWQ=0.88, GPTQ=0.86)
+5. **simplicity** — operational complexity of the backend (vLLM is simpler than TensorRT-LLM)
 
-## benchmark data
+Weights shift based on `optimization_priority`. Hard constraints (VRAM, budget × 2, latency, throughput) filter or crush the score before ranking.
 
-benchmark profiles live in `benchmarks/profiles/` as JSON.
-each profile has measured or estimated perf numbers per model x GPU x backend x quant combo.
+## Benchmark data
 
-all entries are labeled with their source: `measured`, `estimated`, or `imported`.
-we don't fake precision — if a number is estimated, it says so.
+Profiles live in `benchmarks/profiles/` as JSON, labeled with their source: `measured`, `estimated`, or `imported`. **We don't fake precision** — if a number is estimated, it says so.
 
-### measured profiles (RTX 4070, single-request, vLLM)
+### Measured profiles (RTX 4070, single-request, vLLM)
 
 | Model        | Quant | p95 TTFT | Tok/s |
 |--------------|-------|----------|-------|
@@ -94,42 +146,72 @@ we don't fake precision — if a number is estimated, it says so.
 | Llama 3.2 3B | AWQ   | 122 ms   | 113   |
 | Qwen 2.5 3B  | FP16  | 195 ms   | 66    |
 
-run `python benchmarks/runners/bench.py --model <id> --quantization <quant>` to add more.
-gated repos (Meta Llama) need `HF_TOKEN` exported.
+To add more:
+```bash
+python benchmarks/runners/bench.py --model <id> --quantization <quant>
+```
+Gated repos (Meta Llama) need either `huggingface-cli login` or `HF_TOKEN` exported.
 
-## why kernel-skills is used
+## Forge — kernel optimization layer
 
-NeevPath uses [`@krxgu/kernel-skills`](https://www.npmjs.com/package/@krxgu/kernel-skills)
-as an external instruction source for CUDA, Triton, quantization, benchmarking,
-and kernel optimization workflows.
+Two modes, same gates.
 
-`kernel-skills` provides reusable expert playbooks. NeevPath does not depend on
-it for execution, benchmarking, compilation, or deployment.
+**Manual mode.** You fill the Forge form, get a 75 KB strict markdown prompt with a curated kernel-skills bundle. Hand it to your own coding agent (Claude Code, Cursor, etc.) or write the kernel yourself, drop the five required files into `forge_runs/<id>/candidate/`, then click verify → benchmark → promote.
 
-All execution happens inside NeevPath Forge. Forge retrieves skill bundles,
-creates agent-ready prompts, accepts generated candidate kernels, validates
-correctness, benchmarks performance, and promotes only verified kernels into
-the local kernel registry.
+**Agentic mode** (requires `ANTHROPIC_API_KEY`). Same form, but check the "Autonomous" box. Forge launches a background loop that calls Claude Opus 4.7 with a tool-use surface (`write_candidate_file`, `run_verify`, `run_benchmark`, etc.), iterates up to 5 times under a $3 cost cap, and on success copies the verified Triton kernel into `app/kernels/triton/verified/<op>/<kernel_id>.py` and registers it. A live dashboard shows status, cost, iteration count, gate badges, and a scrolling transcript.
 
-This keeps `kernel-skills` general-purpose and keeps NeevPath responsible for
-correctness, safety, and benchmark-backed promotion.
+Real promoted kernels in this repo (RMSNorm on RTX 4070, fp16, batch=16, hidden_size=4096):
 
-> Do not vendor-copy the kernel-skills repository into NeevPath. Consume it
-> as a version-pinned npm package.
+```
+app/kernels/triton/verified/rmsnorm/
+  triton_rmsnorm_rtx4070_fp16_b16_h4096_v1.py    # 3.66x vs torch eager
+  triton_rmsnorm_rtx4070_fp16_b16_h4096_v2.py    # 3.66x
+  triton_rmsnorm_rtx4070_fp16_b16_h4096_v3.py    # 3.63x  (tightest implementation)
+```
 
-See [`docs/FORGE.md`](docs/FORGE.md) for the full Forge pipeline,
-[`docs/KERNEL_REGISTRY.md`](docs/KERNEL_REGISTRY.md) for the verified-kernel
-schema, [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md) for the measurement
-protocol, and [`docs/CLAIMS.md`](docs/CLAIMS.md) for the rules on what we
-are and are not allowed to say about kernel speedups.
+These were written by the agent, verified against a PyTorch RMSNorm reference at multiple shapes including non-power-of-two, and benchmarked at 200 iterations after 25 warmup iterations.
 
-## what's next
+## Why kernel-skills is used
 
-- [x] benchmark runner scripts for local GPU measurements
-- [x] UI (server-rendered Jinja templates at `/`, `/compare`, `/forge`)
-- [x] comparison view between plans (`POST /api/compare`, `GET /compare`)
-- [x] Forge: kernel-skills-driven kernel optimization loop with verification + promotion
+NeevPath uses [`@krxgu/kernel-skills`](https://www.npmjs.com/package/@krxgu/kernel-skills) as an external instruction source for CUDA, Triton, quantization, benchmarking, and kernel optimization workflows.
+
+`kernel-skills` provides reusable expert playbooks. NeevPath does not depend on it for execution, benchmarking, compilation, or deployment.
+
+All execution happens inside Forge. Forge retrieves skill bundles, creates agent-ready prompts, accepts generated candidate kernels, validates correctness, benchmarks performance, and promotes only verified kernels into the local kernel registry.
+
+This keeps `kernel-skills` general-purpose and keeps NeevPath responsible for correctness, safety, and benchmark-backed promotion.
+
+> Do not vendor-copy the kernel-skills repository into NeevPath. Consume it as a version-pinned npm package.
+
+## Documentation
+
+- [docs/FORGE.md](docs/FORGE.md) — full Forge pipeline, agentic loop, hardware constraints
+- [docs/KERNEL_REGISTRY.md](docs/KERNEL_REGISTRY.md) — registry schema, kernel ID format, evidence levels, promotion rules
+- [docs/BENCHMARKING.md](docs/BENCHMARKING.md) — measurement protocol (warmup, sync, percentiles), output schema, threshold rules
+- [docs/CLAIMS.md](docs/CLAIMS.md) — what we are and aren't allowed to say about kernel speedups
+
+## Testing
+
+```bash
+# default (no GPU required)
+pytest -q                # 93 passed, 1 skipped
+
+# CUDA-required tests (real GPU)
+pytest -m cuda -q
+```
+
+The single skipped test is the kernel-skills CLI integration test, opt-in via `NEEVPATH_FORGE_INTEGRATION=1`.
+
+## What's next
+
+- [x] benchmark runner with measured RTX 4070 profiles
+- [x] UI: server-rendered Jinja templates at `/`, `/compare`, `/forge`
+- [x] comparison endpoint + side-by-side cards
+- [x] Forge: kernel-skills-driven optimization with verify + benchmark + promote gates
 - [x] verified kernel registry annotated onto recommendation results (op-level evidence)
+- [x] autonomous agentic mode with Claude Opus 4.7 orchestrator
+- [x] real promoted Triton kernels in the registry (RMSNorm on RTX 4070)
 - [ ] live deployment to NeevCloud endpoints (currently exports config artifact only)
 - [ ] more models and GPU tiers
-- [ ] runtime-level integration of promoted kernels (currently op-level only)
+- [ ] runtime-level integration of promoted kernels (currently op-level evidence only — see docs/CLAIMS.md)
+- [ ] more ops in Forge: fused add+RMSNorm, softmax, sampling, KV cache append, dequant, RoPE
