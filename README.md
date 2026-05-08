@@ -20,6 +20,9 @@ and a deployment config you can actually use.
 # python 3.11+ required
 pip install -r requirements.txt
 
+# install kernel-skills (Node 18+ required for Forge)
+bash scripts/install_kernel_skills.sh
+
 # run the API server
 python -m uvicorn app.main:app --reload --port 8000
 
@@ -94,10 +97,39 @@ we don't fake precision — if a number is estimated, it says so.
 run `python benchmarks/runners/bench.py --model <id> --quantization <quant>` to add more.
 gated repos (Meta Llama) need `HF_TOKEN` exported.
 
+## why kernel-skills is used
+
+NeevPath uses [`@krxgu/kernel-skills`](https://www.npmjs.com/package/@krxgu/kernel-skills)
+as an external instruction source for CUDA, Triton, quantization, benchmarking,
+and kernel optimization workflows.
+
+`kernel-skills` provides reusable expert playbooks. NeevPath does not depend on
+it for execution, benchmarking, compilation, or deployment.
+
+All execution happens inside NeevPath Forge. Forge retrieves skill bundles,
+creates agent-ready prompts, accepts generated candidate kernels, validates
+correctness, benchmarks performance, and promotes only verified kernels into
+the local kernel registry.
+
+This keeps `kernel-skills` general-purpose and keeps NeevPath responsible for
+correctness, safety, and benchmark-backed promotion.
+
+> Do not vendor-copy the kernel-skills repository into NeevPath. Consume it
+> as a version-pinned npm package.
+
+See [`docs/FORGE.md`](docs/FORGE.md) for the full Forge pipeline,
+[`docs/KERNEL_REGISTRY.md`](docs/KERNEL_REGISTRY.md) for the verified-kernel
+schema, [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md) for the measurement
+protocol, and [`docs/CLAIMS.md`](docs/CLAIMS.md) for the rules on what we
+are and are not allowed to say about kernel speedups.
+
 ## what's next
 
 - [x] benchmark runner scripts for local GPU measurements
-- [x] UI (server-rendered Jinja templates at `/` and `/compare`)
+- [x] UI (server-rendered Jinja templates at `/`, `/compare`, `/forge`)
 - [x] comparison view between plans (`POST /api/compare`, `GET /compare`)
+- [x] Forge: kernel-skills-driven kernel optimization loop with verification + promotion
+- [x] verified kernel registry annotated onto recommendation results (op-level evidence)
 - [ ] live deployment to NeevCloud endpoints (currently exports config artifact only)
 - [ ] more models and GPU tiers
+- [ ] runtime-level integration of promoted kernels (currently op-level only)
