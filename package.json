@@ -1,0 +1,16 @@
+{
+  "name": "neevpath-forge-tools",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@krxgu/kernel-skills": "0.2.0"
+  },
+  "scripts": {
+    "kernel-skills:list": "kernel-skills list",
+    "kernel-skills:search": "kernel-skills search",
+    "kernel-skills:bundle": "kernel-skills bundle"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
