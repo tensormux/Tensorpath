@@ -1,0 +1,199 @@
+{
+  "kernels": [
+    {
+      "kernel_id": "triton_rmsnorm_rtx4070_fp16_h4096_v1",
+      "op": "rmsnorm",
+      "language": "triton",
+      "source_path": "app/kernels/triton/verified/rmsnorm/triton_rmsnorm_rtx4070_fp16_h4096_v1.py",
+      "target_gpu": "RTX 4070",
+      "dtype": "fp16",
+      "shape": {
+        "hidden_size": 4096
+      },
+      "verification": {
+        "passed": true,
+        "max_abs_error": null,
+        "max_rel_error": null,
+        "tolerance": {
+          "rtol": 0.001,
+          "atol": 0.001
+        },
+        "tested_shapes": [],
+        "failure_reason": null
+      },
+      "benchmark": {
+        "passed": true,
+        "baseline_latency_us": 42.1,
+        "candidate_latency_us": 24.8,
+        "speedup": 1.69,
+        "warmup_iters": 20,
+        "benchmark_iters": 100,
+        "gpu_name": "NVIDIA GeForce RTX 4070",
+        "notes": null
+      },
+      "skill_ids": [
+        "inference.write-triton-rmsnorm-kernel",
+        "patterns.write-kernel-test-plan",
+        "patterns.handle-boundary-conditions"
+      ],
+      "evidence_level": "op_level",
+      "created_at": "2026-05-07T00:00:00Z"
+    },
+    {
+      "kernel_id": "triton_rmsnorm_h100_fp16_h4096_v1",
+      "op": "rmsnorm",
+      "language": "triton",
+      "source_path": "app/kernels/triton/verified/rmsnorm/triton_rmsnorm_h100_fp16_h4096_v1.py",
+      "target_gpu": "H100",
+      "dtype": "fp16",
+      "shape": {
+        "hidden_size": 4096
+      },
+      "verification": {
+        "passed": true,
+        "max_abs_error": null,
+        "max_rel_error": null,
+        "tolerance": {
+          "rtol": 0.001,
+          "atol": 0.001
+        },
+        "tested_shapes": [],
+        "failure_reason": null
+      },
+      "benchmark": {
+        "passed": true,
+        "baseline_latency_us": 14.2,
+        "candidate_latency_us": 8.6,
+        "speedup": 1.65,
+        "warmup_iters": 20,
+        "benchmark_iters": 100,
+        "gpu_name": "NVIDIA H100 SXM",
+        "notes": null
+      },
+      "skill_ids": [
+        "inference.write-triton-rmsnorm-kernel",
+        "patterns.write-kernel-test-plan",
+        "patterns.handle-boundary-conditions"
+      ],
+      "evidence_level": "op_level",
+      "created_at": "2026-05-07T00:00:00Z"
+    },
+    {
+      "kernel_id": "triton_rmsnorm_rtx4070_fp16_b16_h4096_v1",
+      "op": "rmsnorm",
+      "language": "triton",
+      "source_path": "app/kernels/triton/verified/rmsnorm/triton_rmsnorm_rtx4070_fp16_b16_h4096_v1.py",
+      "target_gpu": "RTX 4070",
+      "dtype": "fp16",
+      "shape": {
+        "batch": 16,
+        "hidden_size": 4096
+      },
+      "verification": {
+        "passed": true,
+        "max_abs_error": null,
+        "max_rel_error": null,
+        "tolerance": {},
+        "tested_shapes": [],
+        "failure_reason": null
+      },
+      "benchmark": {
+        "passed": true,
+        "baseline_latency_us": 86.13375663757324,
+        "candidate_latency_us": 23.530240058898926,
+        "speedup": 3.6605557963697115,
+        "warmup_iters": 25,
+        "benchmark_iters": 200,
+        "gpu_name": "NVIDIA GeForce RTX 4070",
+        "notes": null
+      },
+      "skill_ids": [
+        "patterns.handle-boundary-conditions",
+        "patterns.write-kernel-test-plan",
+        "triton.write-triton-layernorm-kernel",
+        "inference.write-triton-fused-add-rmsnorm-kernel",
+        "inference.write-triton-rmsnorm-kernel"
+      ],
+      "evidence_level": "op_level",
+      "created_at": "2026-05-08T05:08:55.309759Z"
+    },
+    {
+      "kernel_id": "triton_rmsnorm_rtx4070_fp16_b16_h4096_v2",
+      "op": "rmsnorm",
+      "language": "triton",
+      "source_path": "app/kernels/triton/verified/rmsnorm/triton_rmsnorm_rtx4070_fp16_b16_h4096_v2.py",
+      "target_gpu": "RTX 4070",
+      "dtype": "fp16",
+      "shape": {
+        "batch": 16,
+        "hidden_size": 4096
+      },
+      "verification": {
+        "passed": true,
+        "max_abs_error": null,
+        "max_rel_error": null,
+        "tolerance": {},
+        "tested_shapes": [],
+        "failure_reason": null
+      },
+      "benchmark": {
+        "passed": true,
+        "baseline_latency_us": 86.13375663757324,
+        "candidate_latency_us": 23.530240058898926,
+        "speedup": 3.6605557963697115,
+        "warmup_iters": 25,
+        "benchmark_iters": 200,
+        "gpu_name": "NVIDIA GeForce RTX 4070",
+        "notes": null
+      },
+      "skill_ids": [
+        "patterns.handle-boundary-conditions",
+        "patterns.write-kernel-test-plan",
+        "triton.write-triton-layernorm-kernel",
+        "inference.write-triton-fused-add-rmsnorm-kernel",
+        "inference.write-triton-rmsnorm-kernel"
+      ],
+      "evidence_level": "op_level",
+      "created_at": "2026-05-08T05:09:21.491793Z"
+    },
+    {
+      "kernel_id": "triton_rmsnorm_rtx4070_fp16_b16_h4096_v3",
+      "op": "rmsnorm",
+      "language": "triton",
+      "source_path": "app/kernels/triton/verified/rmsnorm/triton_rmsnorm_rtx4070_fp16_b16_h4096_v3.py",
+      "target_gpu": "RTX 4070",
+      "dtype": "fp16",
+      "shape": {
+        "batch": 16,
+        "hidden_size": 4096
+      },
+      "verification": {
+        "passed": true,
+        "max_abs_error": null,
+        "max_rel_error": null,
+        "tolerance": {},
+        "tested_shapes": [],
+        "failure_reason": null
+      },
+      "benchmark": {
+        "passed": true,
+        "baseline_latency_us": 81.82671546936035,
+        "candidate_latency_us": 22.563838958740234,
+        "speedup": 3.626453619837785,
+        "warmup_iters": 30,
+        "benchmark_iters": 200,
+        "gpu_name": "NVIDIA GeForce RTX 4070",
+        "notes": null
+      },
+      "skill_ids": [
+        "patterns.handle-boundary-conditions",
+        "patterns.write-kernel-test-plan",
+        "triton.write-triton-layernorm-kernel",
+        "inference.write-triton-fused-add-rmsnorm-kernel",
+        "inference.write-triton-rmsnorm-kernel"
+      ],
+      "evidence_level": "op_level",
+      "created_at": "2026-05-08T05:11:49.842911Z"
+    }
+  ]
+}
