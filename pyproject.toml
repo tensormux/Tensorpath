@@ -7,3 +7,7 @@ requires-python = ">=3.11"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "cuda: requires CUDA GPU (skipped by default; run with `pytest -m cuda`)",
+    "forge: forge pipeline tests",
+]
