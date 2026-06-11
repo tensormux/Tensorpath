@@ -84,8 +84,9 @@ def _to_float(value: str | None) -> float | None:
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request):
     return _templates.TemplateResponse(
+        request,
         "index.html",
-        {"request": request, "choices": _form_choices()},
+        {"choices": _form_choices()},
     )
 
 
@@ -122,9 +123,9 @@ def recommend(
         result = _engine.recommend(rec_request)
     except ValueError as e:
         return _templates.TemplateResponse(
+            request,
             "index.html",
             {
-                "request": request,
                 "choices": _form_choices(),
                 "error": str(e),
                 "submitted": rec_request.model_dump(),
@@ -135,9 +136,9 @@ def recommend(
     config = export_config(plan=result.recommended, workload_type=rec_request.workload_type)
 
     return _templates.TemplateResponse(
+        request,
         "result.html",
         {
-            "request": request,
             "result": result,
             "config": config,
             "submitted": rec_request,
@@ -148,8 +149,9 @@ def recommend(
 @router.get("/compare", response_class=HTMLResponse)
 def compare_form(request: Request):
     return _templates.TemplateResponse(
+        request,
         "compare.html",
-        {"request": request, "choices": _form_choices()},
+        {"choices": _form_choices()},
     )
 
 
@@ -168,9 +170,9 @@ def compare_submit(
     distinct_ids = list(dict.fromkeys(model_ids))
     if len(distinct_ids) < 2:
         return _templates.TemplateResponse(
+            request,
             "compare.html",
             {
-                "request": request,
                 "choices": _form_choices(),
                 "error": "Pick at least two distinct models to compare.",
                 "submitted": {
@@ -201,9 +203,9 @@ def compare_submit(
         comparison = _engine.compare(cmp_request)
     except ValueError as e:
         return _templates.TemplateResponse(
+            request,
             "compare.html",
             {
-                "request": request,
                 "choices": _form_choices(),
                 "error": str(e),
                 "submitted": cmp_request.model_dump(),
@@ -212,9 +214,9 @@ def compare_submit(
         )
 
     return _templates.TemplateResponse(
+        request,
         "compare_result.html",
         {
-            "request": request,
             "comparison": comparison,
             "submitted": cmp_request,
         },
@@ -252,8 +254,7 @@ def _forge_state(notice: str | None = None, error: str | None = None) -> dict:
 
 @router.get("/forge", response_class=HTMLResponse)
 def forge_index(request: Request):
-    ctx = {"request": request, **_forge_state()}
-    return _templates.TemplateResponse("forge.html", ctx)
+    return _templates.TemplateResponse(request, "forge.html", _forge_state())
 
 
 @router.post("/forge/runs", response_class=HTMLResponse)
@@ -283,8 +284,11 @@ def forge_create_run(
         except ValueError:
             pass
     if not shape:
-        ctx = {"request": request, **_forge_state(error="At least one shape dimension is required.")}
-        return _templates.TemplateResponse("forge.html", ctx, status_code=400)
+        return _templates.TemplateResponse(
+            request, "forge.html",
+            _forge_state(error="At least one shape dimension is required."),
+            status_code=400,
+        )
 
     try:
         task = KernelTaskSpec(
@@ -296,8 +300,11 @@ def forge_create_run(
             objective=objective,  # type: ignore[arg-type]
         )
     except ValueError as e:
-        ctx = {"request": request, **_forge_state(error=str(e))}
-        return _templates.TemplateResponse("forge.html", ctx, status_code=400)
+        return _templates.TemplateResponse(
+            request, "forge.html",
+            _forge_state(error=str(e)),
+            status_code=400,
+        )
 
     run = create_run(task, _REPO_ROOT_FORGE)
     bundle_spec = ForgeTaskPlanner(provider=KernelSkillsProvider(_REPO_ROOT_FORGE)).plan(task)
@@ -323,14 +330,15 @@ def forge_create_run(
         )
         start_agentic_run(run, _REPO_ROOT_FORGE, config)
         return _templates.TemplateResponse(
+            request,
             "forge_agentic_run.html",
-            {"request": request, "run": run, "config": config},
+            {"run": run, "config": config},
         )
 
     return _templates.TemplateResponse(
+        request,
         "forge_run.html",
         {
-            "request": request,
             "run": run,
             "candidate_present": False,
             "verification_report": None,
@@ -346,11 +354,15 @@ def forge_agentic_dashboard(request: Request, run_id: str):
     try:
         run = load_run(run_id, _REPO_ROOT_FORGE)
     except FileNotFoundError:
-        ctx = {"request": request, **_forge_state(error=f"Run not found: {run_id}")}
-        return _templates.TemplateResponse("forge.html", ctx, status_code=404)
+        return _templates.TemplateResponse(
+            request, "forge.html",
+            _forge_state(error=f"Run not found: {run_id}"),
+            status_code=404,
+        )
     return _templates.TemplateResponse(
+        request,
         "forge_agentic_run.html",
-        {"request": request, "run": run, "config": None},
+        {"run": run, "config": None},
     )
 
 
@@ -389,12 +401,12 @@ def forge_run_detail(request: Request, run_id: str):
     try:
         artifacts = _load_run_artifacts(run_id)
     except FileNotFoundError:
-        ctx = {"request": request, **_forge_state(error=f"Run not found: {run_id}")}
-        return _templates.TemplateResponse("forge.html", ctx, status_code=404)
-    return _templates.TemplateResponse(
-        "forge_run.html",
-        {"request": request, **artifacts},
-    )
+        return _templates.TemplateResponse(
+            request, "forge.html",
+            _forge_state(error=f"Run not found: {run_id}"),
+            status_code=404,
+        )
+    return _templates.TemplateResponse(request, "forge_run.html", artifacts)
 
 
 @router.post("/forge/runs/{run_id}/verify", response_class=HTMLResponse)
@@ -406,16 +418,20 @@ def forge_run_verify(
     try:
         run = load_run(run_id, _REPO_ROOT_FORGE)
     except FileNotFoundError:
-        ctx = {"request": request, **_forge_state(error=f"Run not found: {run_id}")}
-        return _templates.TemplateResponse("forge.html", ctx, status_code=404)
+        return _templates.TemplateResponse(
+            request, "forge.html",
+            _forge_state(error=f"Run not found: {run_id}"),
+            status_code=404,
+        )
 
     skip_cuda = bool(skip_cuda_check)
     verify_candidate(run, _REPO_ROOT_FORGE, require_cuda=not skip_cuda)
 
     artifacts = _load_run_artifacts(run_id)
     return _templates.TemplateResponse(
+        request,
         "forge_run.html",
-        {"request": request, **artifacts, "notice": "Verification finished — see report below."},
+        {**artifacts, "notice": "Verification finished — see report below."},
     )
 
 
@@ -424,14 +440,18 @@ def forge_run_benchmark(request: Request, run_id: str):
     try:
         run = load_run(run_id, _REPO_ROOT_FORGE)
     except FileNotFoundError:
-        ctx = {"request": request, **_forge_state(error=f"Run not found: {run_id}")}
-        return _templates.TemplateResponse("forge.html", ctx, status_code=404)
+        return _templates.TemplateResponse(
+            request, "forge.html",
+            _forge_state(error=f"Run not found: {run_id}"),
+            status_code=404,
+        )
 
     benchmark_candidate(run, _REPO_ROOT_FORGE)
     artifacts = _load_run_artifacts(run_id)
     return _templates.TemplateResponse(
+        request,
         "forge_run.html",
-        {"request": request, **artifacts, "notice": "Benchmark finished — see report below."},
+        {**artifacts, "notice": "Benchmark finished — see report below."},
     )
 
 
@@ -440,8 +460,11 @@ def forge_run_promote(request: Request, run_id: str):
     try:
         run = load_run(run_id, _REPO_ROOT_FORGE)
     except FileNotFoundError:
-        ctx = {"request": request, **_forge_state(error=f"Run not found: {run_id}")}
-        return _templates.TemplateResponse("forge.html", ctx, status_code=404)
+        return _templates.TemplateResponse(
+            request, "forge.html",
+            _forge_state(error=f"Run not found: {run_id}"),
+            status_code=404,
+        )
 
     notice: str | None = None
     error: str | None = None
@@ -453,6 +476,7 @@ def forge_run_promote(request: Request, run_id: str):
 
     artifacts = _load_run_artifacts(run_id)
     return _templates.TemplateResponse(
+        request,
         "forge_run.html",
-        {"request": request, **artifacts, "notice": notice, "error": error},
+        {**artifacts, "notice": notice, "error": error},
     )
