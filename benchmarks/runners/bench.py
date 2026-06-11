@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Benchmark runner for NeevPath.
+Benchmark runner for TensorPath.
 
 Runs inference on a local GPU with vLLM and records real performance numbers.
 Results are saved to benchmarks/profiles/ in the same format the recommendation
@@ -253,7 +253,7 @@ def save_profile(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="NeevPath benchmark runner")
+    parser = argparse.ArgumentParser(description="TensorPath benchmark runner")
     parser.add_argument("--model", required=True, help="Model ID (e.g. qwen2.5-7b)")
     parser.add_argument("--quantization", default="awq", choices=["fp16", "bf16", "awq", "gptq"])
     parser.add_argument("--num-prompts", type=int, default=20, help="Number of prompts to run")
@@ -296,7 +296,7 @@ def main():
     except Exception:
         gpu_name = "Unknown GPU"
 
-    print(f"NeevPath Benchmark Runner")
+    print(f"TensorPath Benchmark Runner")
     print(f"GPU:          {gpu_name}")
     print(f"Model:        {args.model}")
     print(f"Quantization: {args.quantization}")

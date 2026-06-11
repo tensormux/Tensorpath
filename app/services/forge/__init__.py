@@ -1,4 +1,4 @@
-"""NeevPath Forge — kernel optimization loop.
+"""TensorPath Forge — kernel optimization loop.
 
 Forge is the execution layer that retrieves skill bundles from
 `@krxgu/kernel-skills`, builds agent-ready prompts, accepts candidate kernels,

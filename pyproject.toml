@@ -1,7 +1,7 @@
 [project]
-name = "neevpath"
+name = "tensorpath"
 version = "0.1.0"
-description = "Inference optimization control plane for NeevCloud"
+description = "Inference optimization control plane — by TensorMux"
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]

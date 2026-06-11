@@ -1,6 +1,6 @@
-# NeevPath Forge
+# TensorPath Forge
 
-Forge is the kernel optimization loop in NeevPath. It turns a workload into a
+Forge is the kernel optimization loop in TensorPath. It turns a workload into a
 strict agent-ready kernel task, accepts candidate kernel files, validates them
 against a PyTorch reference, benchmarks them against the baseline, and
 promotes only verified kernels into a local registry that the recommendation
@@ -11,11 +11,11 @@ framework. It is a verification and promotion pipeline.
 
 ## Why kernel-skills is used
 
-NeevPath consumes [`@krxgu/kernel-skills`](https://www.npmjs.com/package/@krxgu/kernel-skills)
+TensorPath consumes [`@krxgu/kernel-skills`](https://www.npmjs.com/package/@krxgu/kernel-skills)
 as an external instruction source for CUDA, Triton, quantization, benchmarking,
 and kernel optimization workflows.
 
-`kernel-skills` provides reusable expert playbooks. NeevPath does not depend on
+`kernel-skills` provides reusable expert playbooks. TensorPath does not depend on
 it for execution, benchmarking, compilation, or deployment.
 
 All execution happens inside Forge. Forge retrieves skill bundles, creates
@@ -23,10 +23,10 @@ agent-ready prompts, accepts generated candidate kernels, validates correctness,
 benchmarks performance, and promotes only verified kernels into the local
 kernel registry.
 
-This keeps `kernel-skills` general-purpose and keeps NeevPath responsible for
+This keeps `kernel-skills` general-purpose and keeps TensorPath responsible for
 correctness, safety, and benchmark-backed promotion.
 
-> Do not vendor-copy the kernel-skills repository into NeevPath. Consume it as
+> Do not vendor-copy the kernel-skills repository into TensorPath. Consume it as
 > a version-pinned npm package.
 
 ## How a Forge run works

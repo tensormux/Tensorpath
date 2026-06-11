@@ -4,7 +4,7 @@
 
 set -e
 
-echo "=== NeevPath Benchmark Setup ==="
+echo "=== TensorPath Benchmark Setup ==="
 
 # check GPU
 echo "Checking GPU..."

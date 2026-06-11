@@ -199,7 +199,7 @@ async def run_latency_bench(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="NeevPath server-based benchmark")
+    parser = argparse.ArgumentParser(description="TensorPath server-based benchmark")
     parser.add_argument("--model", required=True, help="Model ID")
     parser.add_argument("--quantization", default="awq", choices=["fp16", "bf16", "awq", "gptq"])
     parser.add_argument("--num-prompts", type=int, default=20)
@@ -221,7 +221,7 @@ def main():
     except Exception:
         gpu_name = "Unknown GPU"
 
-    print(f"NeevPath Server Benchmark")
+    print(f"TensorPath Server Benchmark")
     print(f"GPU:          {gpu_name}")
     print(f"Model:        {args.model} ({hf_repo})")
     print(f"Quantization: {args.quantization}")

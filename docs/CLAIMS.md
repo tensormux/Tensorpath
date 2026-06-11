@@ -1,12 +1,12 @@
 # Allowed and disallowed claims
 
 The point of this document: keep the marketing language and the engineering
-language in agreement. NeevPath is supposed to be ambitious *and* credible.
+language in agreement. TensorPath is supposed to be ambitious *and* credible.
 The line between the two is what's measured vs. what's wished for.
 
 ## Allowed
 
-> NeevPath can generate skill-guided kernel optimization tasks and promote
+> TensorPath can generate skill-guided kernel optimization tasks and promote
 > verified kernels after correctness and benchmark checks.
 
 > This RMSNorm candidate is **1.69× faster than the PyTorch baseline for
@@ -19,13 +19,13 @@ The line between the two is what's measured vs. what's wished for.
 > kernel-skills is consumed as a version-pinned external npm package. It
 > provides expert instruction content; it does not run code.
 
-> NeevPath Forge runs every promoted kernel through correctness tests
+> TensorPath Forge runs every promoted kernel through correctness tests
 > (PyTorch reference) and a microbenchmark with explicit warmup, CUDA
 > synchronization, and a 1.10× minimum speedup threshold.
 
 ## Not allowed
 
-> ❌ NeevPath automatically optimizes every kernel in every model.
+> ❌ TensorPath automatically optimizes every kernel in every model.
 
 We optimize one op per Forge run, and only when a developer or agent
 produces a candidate that passes both gates.
@@ -43,9 +43,9 @@ benchmark proves the integration.
 Promoted kernels are metadata + source artifacts. Wiring them into a serving
 runtime, then benchmarking the full endpoint, is a separate step.
 
-> ❌ NeevPath synthesizes CUDA kernels from scratch.
+> ❌ TensorPath synthesizes CUDA kernels from scratch.
 
-NeevPath productizes existing optimized kernel paths and verifies new ones
+TensorPath productizes existing optimized kernel paths and verifies new ones
 that humans or agents write. It does not do compiler-level synthesis.
 
 > ❌ This benchmark proves the kernel is faster than vendor libraries.

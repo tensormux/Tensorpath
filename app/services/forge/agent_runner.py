@@ -103,7 +103,7 @@ def _build_system_prompt(run: ForgeRun, repo_root: Path) -> list[dict]:
     bundle = bundle_path.read_text() if bundle_path.exists() else ""
 
     rules = (
-        "You are NeevPath Forge — an autonomous kernel optimization agent.\n"
+        "You are TensorPath Forge — an autonomous kernel optimization agent.\n"
         "\n"
         "Your job: write a verified, faster kernel for one specific operation on "
         f"one specific GPU/dtype/shape. The task is `{run.task.op.value}` in "

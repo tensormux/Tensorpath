@@ -1,5 +1,5 @@
 {
-  "name": "neevpath-forge-tools",
+  "name": "tensorpath-forge-tools",
   "private": true,
   "type": "module",
   "dependencies": {

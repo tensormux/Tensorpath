@@ -40,7 +40,7 @@ def build_agent_prompt(spec: SkillBundleSpec, run_id: str | None = None) -> str:
     return f"""# Kernel Optimization Task
 
 You are generating a {task.language.value.title()} kernel candidate for an
-inference optimization pipeline. NeevPath Forge will validate your output
+inference optimization pipeline. TensorPath Forge will validate your output
 against a reference implementation and benchmark it against the baseline.
 Code that fails verification or speedup thresholds will be rejected and
 will not be promoted into the kernel registry.

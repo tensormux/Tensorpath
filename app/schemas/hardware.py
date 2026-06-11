@@ -23,7 +23,7 @@ class GpuSpec(BaseModel):
         return self.hourly_cost_usd * 730  # avg hours in a month
 
 
-# real-world specs and approximate neevcloud-style pricing
+# real-world GPU specs and approximate cloud market pricing
 GPU_CATALOG: dict[GpuTier, GpuSpec] = {
     GpuTier.L4: GpuSpec(
         tier=GpuTier.L4,

@@ -1,8 +1,8 @@
-# NeevPath — Inference Optimizer for NeevCloud
+# TensorPath — Inference Optimization Control Plane
 
-NeevCloud gives you GPUs. NeevPath tells you the best way to use them.
+> Part of the [TensorMux](https://www.tensormux.com/) open-source ecosystem.
 
-You give it a model, a workload, and what you care about (latency, throughput, cost). It picks the best GPU + backend + quantization combo, explains why, and hands you a deployment-ready config. NeevPath also has a kernel optimization layer (Forge) that can autonomously generate and verify faster Triton kernels for specific GPU + dtype + shape combinations and surface them on recommendation results.
+TensorPath tells you the best way to serve an LLM. Give it a model, a workload, and what you care about — latency, throughput, or cost — and it picks the optimal GPU + backend + quantization combination, explains why, and hands you a deployment-ready config. It also ships a kernel optimization layer (Forge) that can autonomously generate and verify faster Triton kernels for specific GPU + dtype + shape combinations.
 
 ## What it does
 
@@ -115,11 +115,11 @@ tests/             93 unit tests + 1 opt-in integration test
 
 ## Supported surface (MVP)
 
-**models:** Qwen 2.5 7B, Qwen 2.5 3B, Llama 3.1 8B, Llama 3.2 3B
-**GPUs:** L4, L40S, A100-80GB, H100 (datacenter); RTX 4070 (local for measured profiles)
-**backends:** vLLM, TensorRT-LLM
-**quantizations:** FP16, BF16, FP8, AWQ 4-bit, GPTQ 4-bit
-**priorities:** latency, throughput, cost, balanced
+**models:** Qwen 2.5 7B, Qwen 2.5 3B, Llama 3.1 8B, Llama 3.2 3B  
+**GPUs:** L4, L40S, A100-80GB, H100 (datacenter); RTX 4070 (local for measured profiles)  
+**backends:** vLLM, TensorRT-LLM  
+**quantizations:** FP16, BF16, FP8, AWQ 4-bit, GPTQ 4-bit  
+**priorities:** latency, throughput, cost, balanced  
 
 ## How scoring works
 
@@ -135,7 +135,7 @@ Weights shift based on `optimization_priority`. Hard constraints (VRAM, budget �
 
 ## Benchmark data
 
-Profiles live in `benchmarks/profiles/` as JSON, labeled with their source: `measured`, `estimated`, or `imported`. **We don't fake precision** — if a number is estimated, it says so.
+Profiles live in `benchmarks/profiles/` as JSON, labeled with their source: `measured`, `estimated`, or `imported`. We don't fake precision — if a number is estimated, it says so.
 
 ### Measured profiles (RTX 4070, single-request, vLLM)
 
@@ -173,15 +173,11 @@ These were written by the agent, verified against a PyTorch RMSNorm reference at
 
 ## Why kernel-skills is used
 
-NeevPath uses [`@krxgu/kernel-skills`](https://www.npmjs.com/package/@krxgu/kernel-skills) as an external instruction source for CUDA, Triton, quantization, benchmarking, and kernel optimization workflows.
+TensorPath uses [`@krxgu/kernel-skills`](https://www.npmjs.com/package/@krxgu/kernel-skills) as an external instruction source for CUDA, Triton, quantization, benchmarking, and kernel optimization workflows.
 
-`kernel-skills` provides reusable expert playbooks. NeevPath does not depend on it for execution, benchmarking, compilation, or deployment.
+`kernel-skills` provides reusable expert playbooks. TensorPath does not depend on it for execution, benchmarking, compilation, or deployment.
 
 All execution happens inside Forge. Forge retrieves skill bundles, creates agent-ready prompts, accepts generated candidate kernels, validates correctness, benchmarks performance, and promotes only verified kernels into the local kernel registry.
-
-This keeps `kernel-skills` general-purpose and keeps NeevPath responsible for correctness, safety, and benchmark-backed promotion.
-
-> Do not vendor-copy the kernel-skills repository into NeevPath. Consume it as a version-pinned npm package.
 
 ## Documentation
 
@@ -202,6 +198,10 @@ pytest -m cuda -q
 
 The single skipped test is the kernel-skills CLI integration test, opt-in via `NEEVPATH_FORGE_INTEGRATION=1`.
 
+## Contributing
+
+TensorPath is open source under [github.com/tensormux](https://github.com/tensormux). PRs welcome — see the docs folder for architecture details before opening a large change.
+
 ## What's next
 
 - [x] benchmark runner with measured RTX 4070 profiles
@@ -211,7 +211,7 @@ The single skipped test is the kernel-skills CLI integration test, opt-in via `N
 - [x] verified kernel registry annotated onto recommendation results (op-level evidence)
 - [x] autonomous agentic mode with Claude Opus 4.7 orchestrator
 - [x] real promoted Triton kernels in the registry (RMSNorm on RTX 4070)
-- [ ] live deployment to NeevCloud endpoints (currently exports config artifact only)
+- [ ] live deployment integration (currently exports config artifact only)
 - [ ] more models and GPU tiers
 - [ ] runtime-level integration of promoted kernels (currently op-level evidence only — see docs/CLAIMS.md)
 - [ ] more ops in Forge: fused add+RMSNorm, softmax, sampling, KV cache append, dequant, RoPE
