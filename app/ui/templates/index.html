@@ -1,10 +1,13 @@
 {% extends "base.html" %}
-{% block title %}NeevPath — recommend a deployment{% endblock %}
+{% block title %}TensorPath — recommend a deployment{% endblock %}
 
 {% block content %}
 {% if error %}
   <div class="error">{{ error }}</div>
 {% endif %}
+
+<div class="page-title">Find the right inference stack</div>
+<div class="page-subtitle">Give us a model, workload, and what you care about — we'll rank the best GPU + backend + quantization combination.</div>
 
 <h2>Tell us what you want to serve</h2>
 <form method="post" action="/recommend" class="card">

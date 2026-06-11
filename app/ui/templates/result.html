@@ -82,7 +82,7 @@
     end-to-end latency/cost numbers above.
   </p>
   {% for ko in result.recommended.kernel_optimizations %}
-    <div style="border-left: 3px solid var(--accent); padding: 10px 14px; margin-bottom: 10px; background: var(--accent-soft); border-radius: 0 4px 4px 0;">
+    <div class="kernel-highlight">
       <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px;">
         <div>
           <strong>{{ ko.op }}</strong>
@@ -120,7 +120,7 @@
 <h2 style="margin-top: 32px;">Deployment config</h2>
 <div class="card">
   <p style="margin: 0 0 12px; font-size: 13px; color: var(--fg-muted);">
-    JSON below maps directly to NeevCloud inference deploy parameters.
+    JSON deployment config — wire this into your inference cluster directly.
   </p>
   <pre>{{ config.model_dump_json(indent=2) }}</pre>
 </div>
