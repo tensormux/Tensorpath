@@ -195,3 +195,110 @@ def test_read_skill_delegates_to_provider(tmp_path: Path):
     assert not result.is_error
     assert result.content == "# Skill markdown content"
     provider.show.assert_called_once_with("inference.write-triton-rmsnorm-kernel")
+
+
+def test_unknown_tool_returns_error(tmp_path: Path):
+    run = _make_run(tmp_path)
+    provider = _provider()
+
+    result = handle_tool(
+        "nonexistent_tool",
+        {},
+        run=run,
+        repo_root=tmp_path,
+        provider=provider,
+    )
+    assert result.is_error
+    assert "unknown tool" in result.content.lower()
+
+
+def test_tool_exception_returns_error(tmp_path: Path):
+    run = _make_run(tmp_path)
+    provider = _provider()
+    provider.show.side_effect = RuntimeError("CLI crashed")
+
+    result = handle_tool(
+        "read_skill",
+        {"skill_id": "some.skill"},
+        run=run,
+        repo_root=tmp_path,
+        provider=provider,
+    )
+    assert result.is_error
+    assert "RuntimeError" in result.content
+    assert "CLI crashed" in result.content
+
+
+def test_run_verify_delegates_to_verifier(tmp_path: Path):
+    from app.services.forge.models import VerificationResult
+    from unittest.mock import patch
+
+    run = _make_run(tmp_path)
+    provider = _provider()
+
+    fake_result = VerificationResult(passed=True, tolerance={"atol": 1e-5})
+
+    with patch("app.services.forge.agent_tools.verify_candidate") as mock_verify:
+        mock_verify.return_value = (run, fake_result)
+
+        result = handle_tool(
+            "run_verify",
+            {"skip_cuda_check": True},
+            run=run,
+            repo_root=tmp_path,
+            provider=provider,
+        )
+
+        assert not result.is_error
+        assert "passed" in result.content
+        mock_verify.assert_called_once()
+        call_kwargs = mock_verify.call_args[1]
+        assert call_kwargs["require_cuda"] is False
+
+
+def test_run_benchmark_delegates_to_benchmarker(tmp_path: Path):
+    from app.services.forge.models import BenchmarkResult
+    from unittest.mock import patch
+
+    run = _make_run(tmp_path)
+    provider = _provider()
+
+    fake_result = BenchmarkResult(
+        passed=True,
+        baseline_latency_us=100.0,
+        candidate_latency_us=50.0,
+        speedup=2.0,
+        warmup_iters=20,
+        benchmark_iters=100,
+    )
+
+    with patch("app.services.forge.agent_tools.benchmark_candidate") as mock_bench:
+        mock_bench.return_value = (run, fake_result)
+
+        result = handle_tool(
+            "run_benchmark",
+            {},
+            run=run,
+            repo_root=tmp_path,
+            provider=provider,
+        )
+
+        assert not result.is_error
+        assert "passed" in result.content
+        assert "2.0" in result.content
+        mock_bench.assert_called_once()
+
+
+def test_read_candidate_file_rejects_bad_path(tmp_path: Path):
+    run = _make_run(tmp_path)
+    provider = _provider()
+
+    result = handle_tool(
+        "read_candidate_file",
+        {"filename": "../etc/passwd"},
+        run=run,
+        repo_root=tmp_path,
+        provider=provider,
+    )
+    assert result.is_error
+    assert "invalid filename" in result.content.lower()
