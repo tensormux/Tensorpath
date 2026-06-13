@@ -25,7 +25,7 @@ class RuntimeRegistry:
                 name="vllm",
                 display_name="vLLM",
                 supported_quantizations=["fp16", "bf16", "fp8", "awq", "gptq"],
-                supported_gpu_tiers=["l4", "l40s", "a100-80gb", "h100"],
+                supported_gpu_tiers=["l4", "l40s", "a100-80gb", "h100", "rtx4070"],
                 supports_continuous_batching=True,
                 supports_paged_attention=True,
                 supports_speculative_decoding=True,
