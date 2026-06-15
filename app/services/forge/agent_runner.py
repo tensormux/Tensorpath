@@ -207,6 +207,19 @@ def _check_abort(run: ForgeRun, repo_root: Path) -> None:
         raise _AbortRequested()
 
 
+def _sync_abort_flag(state: AgenticRunState, run: ForgeRun, repo_root: Path) -> None:
+    """Merge abort flag from disk into in-memory state before save_state().
+
+    Race condition fix: The API can set abort_requested=True on disk while
+    the orchestrator is running. The in-memory state doesn't know about this
+    change, so save_state() would overwrite it with False. This function
+    reads the disk state and preserves the abort flag if it was set.
+    """
+    disk_state = load_state(run, repo_root)
+    if disk_state and disk_state.abort_requested:
+        state.abort_requested = True
+
+
 def _run_single_turn(
     *,
     client: anthropic.Anthropic,
@@ -347,6 +360,7 @@ def run_agentic_loop(
 
             state.iteration = iteration
             state.last_message = f"Iteration {iteration}/{config.max_iterations} — calling agent."
+            _sync_abort_flag(state, run, repo_root)
             save_state(state, run, repo_root)
 
             response = _run_single_turn(
@@ -378,6 +392,7 @@ def run_agentic_loop(
             if response.stop_reason == "refusal":
                 state.status = AgenticRunStatus.ERRORED
                 state.error = "Agent refused to continue (stop_reason=refusal)."
+                _sync_abort_flag(state, run, repo_root)
                 save_state(state, run, repo_root)
                 return state
 
@@ -393,6 +408,7 @@ def run_agentic_loop(
             # If the model ended its turn without using tools, it's done.
             if response.stop_reason == "end_turn":
                 state.last_message = "Agent ended its turn without further tool calls."
+                _sync_abort_flag(state, run, repo_root)
                 save_state(state, run, repo_root)
                 break
 
@@ -406,15 +422,18 @@ def run_agentic_loop(
             if not tool_results:
                 # No tool_use blocks but stop_reason wasn't end_turn — unusual, stop.
                 state.last_message = "Agent stopped without using any tools."
+                _sync_abort_flag(state, run, repo_root)
                 save_state(state, run, repo_root)
                 break
 
             messages.append({"role": "user", "content": tool_results})
+            _sync_abort_flag(state, run, repo_root)
             save_state(state, run, repo_root)
 
             if give_up_payload is not None:
                 state.status = AgenticRunStatus.REJECTED
                 state.error = f"Agent gave up: {give_up_payload.get('reason', '(unknown)')}"
+                _sync_abort_flag(state, run, repo_root)
                 save_state(state, run, repo_root)
                 return state
 
@@ -422,6 +441,7 @@ def run_agentic_loop(
             if state.last_verify_passed and state.last_benchmark_passed:
                 if _try_promote(run, repo_root, state):
                     state.status = AgenticRunStatus.SUCCEEDED
+                    _sync_abort_flag(state, run, repo_root)
                     save_state(state, run, repo_root)
                     update_run_status(run, ForgeRunStatus.PROMOTED, repo_root)
                     return state
@@ -432,6 +452,7 @@ def run_agentic_loop(
                     f"Cost cap reached (${state.cost_usd:.2f} >= ${state.cost_cap_usd:.2f}) "
                     f"after iteration {iteration}."
                 )
+                _sync_abort_flag(state, run, repo_root)
                 save_state(state, run, repo_root)
                 return state
 
@@ -442,22 +463,26 @@ def run_agentic_loop(
                 f"Exhausted {config.max_iterations} iterations without producing a "
                 f"verified, faster kernel."
             )
+        _sync_abort_flag(state, run, repo_root)
         save_state(state, run, repo_root)
         return state
 
     except _AbortRequested:
         state.status = AgenticRunStatus.ABORTED
         state.last_message = "Aborted by user."
+        _sync_abort_flag(state, run, repo_root)
         save_state(state, run, repo_root)
         return state
     except anthropic.APIStatusError as e:
         state.status = AgenticRunStatus.ERRORED
         state.error = f"Anthropic API error ({e.status_code}): {e.message}"
+        _sync_abort_flag(state, run, repo_root)
         save_state(state, run, repo_root)
         return state
     except Exception as e:
         state.status = AgenticRunStatus.ERRORED
         state.error = f"{type(e).__name__}: {e}"
+        _sync_abort_flag(state, run, repo_root)
         save_state(state, run, repo_root)
         return state
 
