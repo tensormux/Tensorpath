@@ -19,7 +19,7 @@ class BenchmarkStore:
         self._profiles = []
         if not self._dir.exists():
             return
-        for fp in sorted(self._dir.glob("*.json")):
+        for fp in sorted(self._dir.rglob("*.json")):
             with open(fp) as f:
                 data = json.load(f)
             # each file is a list of profiles for one model

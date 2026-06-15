@@ -7,6 +7,7 @@ class GpuTier(str, Enum):
     L40S = "l40s"
     A100_80GB = "a100-80gb"
     H100 = "h100"
+    RTX_4070 = "rtx4070"
 
 
 class GpuSpec(BaseModel):
@@ -60,5 +61,14 @@ GPU_CATALOG: dict[GpuTier, GpuSpec] = {
         fp8_tflops=1979,
         memory_bandwidth_gbps=3350,
         hourly_cost_usd=4.50,
+    ),
+    GpuTier.RTX_4070: GpuSpec(
+        tier=GpuTier.RTX_4070,
+        name="NVIDIA GeForce RTX 4070",
+        vram_gb=12,
+        fp16_tflops=44,
+        fp8_tflops=88,
+        memory_bandwidth_gbps=432,
+        hourly_cost_usd=0.00,
     ),
 }

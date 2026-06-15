@@ -49,7 +49,7 @@ def test_cost_optimized_recommendation():
 
     rec = result.recommended
     # should not pick H100 for a cost-optimized workload
-    assert rec.gpu_tier in ("l4", "l40s"), f"Expected budget GPU, got {rec.gpu_tier}"
+    assert rec.gpu_tier in ("l4", "l40s", "rtx4070"), f"Expected budget GPU, got {rec.gpu_tier}"
     assert rec.estimated_monthly_cost_usd <= 1200
     assert rec.scores.meets_latency is True or rec.estimated_ttft_p95_ms <= 250
 
@@ -108,7 +108,7 @@ def test_recommendation_response_shape():
     assert rec.quantization
     assert rec.estimated_ttft_p95_ms > 0
     assert rec.estimated_tokens_per_sec > 0
-    assert rec.estimated_hourly_cost_usd > 0
+    assert rec.estimated_hourly_cost_usd >= 0
 
 
 def test_compare_two_models():
