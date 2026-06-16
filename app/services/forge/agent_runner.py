@@ -78,6 +78,10 @@ class AgenticRunConfig:
     skip_cuda_check: bool = False
     model: str = DEFAULT_MODEL
     effort: str = DEFAULT_EFFORT
+    max_retries: int = 5
+    retry_base_delay: float = 1.0
+    retry_max_delay: float = 60.0
+    retry_multiplier: float = 2.0
 
 
 # ---- system prompt -------------------------------------------------------
@@ -239,6 +243,90 @@ def _run_single_turn(
     )
 
 
+# ---- retry logic ----------------------------------------------------------
+
+_RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504, 529})
+
+
+def _is_retryable(exc: Exception) -> bool:
+    """Return True if the exception represents a transient API failure."""
+    if isinstance(exc, anthropic.APIConnectionError):
+        return True
+    if isinstance(exc, anthropic.APIStatusError):
+        return exc.status_code in _RETRYABLE_STATUS_CODES
+    return False
+
+
+def _run_single_turn_with_retry(
+    *,
+    client: anthropic.Anthropic,
+    config: AgenticRunConfig,
+    system_prompt: list[dict],
+    messages: list[dict],
+    run: ForgeRun,
+    repo_root: Path,
+    state: AgenticRunState,
+) -> Any:
+    """Call _run_single_turn() with exponential backoff on transient errors.
+
+    Retries up to config.max_retries times. Each retry doubles the delay
+    (capped at config.retry_max_delay) with random jitter. Retry attempts
+    are logged to the transcript and surfaced in state.last_message so the
+    UI can show progress.
+
+    Raises the original exception if all retries are exhausted or if the
+    error is not retryable (e.g. 401 AuthenticationError).
+    """
+    import random
+    import time
+
+    delay = config.retry_base_delay
+
+    for attempt in range(config.max_retries + 1):
+        try:
+            return _run_single_turn(
+                client=client,
+                config=config,
+                system_prompt=system_prompt,
+                messages=messages,
+            )
+        except Exception as exc:
+            if not _is_retryable(exc):
+                raise
+
+            if attempt == config.max_retries:
+                append_transcript(run, repo_root, {
+                    "kind": "retry_exhausted",
+                    "attempts": config.max_retries + 1,
+                    "error": f"{type(exc).__name__}: {exc}",
+                })
+                state.transcript_lines += 1
+                raise
+
+            jitter = random.uniform(0, delay * 0.5)
+            sleep_seconds = min(delay + jitter, config.retry_max_delay)
+
+            state.last_message = (
+                f"API error ({type(exc).__name__}), "
+                f"retry {attempt + 1}/{config.max_retries} "
+                f"in {sleep_seconds:.1f}s..."
+            )
+            state.total_retries += 1
+            save_state(state, run, repo_root)
+
+            append_transcript(run, repo_root, {
+                "kind": "retry_attempt",
+                "attempt": attempt + 1,
+                "max_retries": config.max_retries,
+                "delay_seconds": round(sleep_seconds, 1),
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+            state.transcript_lines += 1
+
+            time.sleep(sleep_seconds)
+            delay *= config.retry_multiplier
+
+
 def _execute_turn(
     *,
     response: Any,
@@ -363,11 +451,14 @@ def run_agentic_loop(
             _sync_abort_flag(state, run, repo_root)
             save_state(state, run, repo_root)
 
-            response = _run_single_turn(
+            response = _run_single_turn_with_retry(
                 client=client,
                 config=config,
                 system_prompt=system_prompt,
                 messages=messages,
+                run=run,
+                repo_root=repo_root,
+                state=state,
             )
 
             # Cost accounting

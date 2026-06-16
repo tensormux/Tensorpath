@@ -73,6 +73,9 @@ class AgenticRunState(BaseModel):
     # transcript
     transcript_lines: int = 0
 
+    # retry tracking
+    total_retries: int = 0
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
