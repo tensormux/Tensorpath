@@ -28,6 +28,46 @@ _WEIGHT_PRESETS: dict[OptimizationPriority, tuple[float, ...]] = {
     OptimizationPriority.BALANCED:   (0.25, 0.22, 0.23, 0.18, 0.12),
 }
 
+# Workload-specific scoring characteristics
+# Each workload type has different priorities for metrics
+_WORKLOAD_PROFILES = {
+    WorkloadType.CHAT: {
+        "latency_metric": "ttft_ms_p95",
+        "streaming_metric": "itl_ms_p95",
+        "throughput_metric": "tokens_per_sec",
+        "latency_weight": 0.6,      # TTFT matters most for first token
+        "streaming_weight": 0.4,    # ITL matters for streaming feel
+    },
+    WorkloadType.CODEGEN: {
+        "latency_metric": "ttft_ms_p95",
+        "streaming_metric": "itl_ms_p95",
+        "throughput_metric": "tokens_per_sec",
+        "latency_weight": 0.3,      # TTFT less critical
+        "streaming_weight": 0.5,    # ITL very important for long outputs
+    },
+    WorkloadType.SUMMARIZATION: {
+        "latency_metric": "ttft_ms_p95",
+        "streaming_metric": "itl_ms_p95",
+        "throughput_metric": "tokens_per_sec",
+        "latency_weight": 0.7,      # TTFT critical (long input processing)
+        "streaming_weight": 0.2,    # ITL less important
+    },
+    WorkloadType.BATCH: {
+        "latency_metric": "ttft_ms_p95",
+        "streaming_metric": None,   # No streaming
+        "throughput_metric": "tokens_per_sec",
+        "latency_weight": 0.0,      # Latency doesn't matter
+        "streaming_weight": 0.0,
+    },
+    WorkloadType.EMBEDDING: {
+        "latency_metric": None,     # No generation
+        "streaming_metric": None,
+        "throughput_metric": "throughput_at_max_concurrency_tps",
+        "latency_weight": 0.0,
+        "streaming_weight": 0.0,
+    },
+}
+
 
 def _normalize(value: float, worst: float, best: float) -> float:
     """Map value into 0-1 where best=1, worst=0. Clamps."""
@@ -51,6 +91,13 @@ def score_candidate(
 
     Scores are relative — we normalize against the min/max seen across all candidates
     so the ranking adapts to whatever options are available.
+    
+    Workload-aware scoring:
+    - CHAT: Prioritizes TTFT + ITL for smooth streaming
+    - CODEGEN: Prioritizes ITL + throughput for long outputs
+    - SUMMARIZATION: Prioritizes TTFT for fast prefill
+    - BATCH: Prioritizes throughput only
+    - EMBEDDING: Prioritizes concurrent throughput
     """
     if not all_profiles:
         return PlanScores(
@@ -58,26 +105,46 @@ def score_candidate(
             weighted_total=0,
         )
 
-    # collect ranges across all candidates for normalization
-    all_latencies = [p.ttft_ms_p95 for p in all_profiles]
-    all_throughputs = [p.tokens_per_sec for p in all_profiles]
-    all_costs = [p.hourly_cost_usd for p in all_profiles]
+    # Get workload-specific profile
+    workload_profile = _WORKLOAD_PROFILES.get(workload_type, _WORKLOAD_PROFILES[WorkloadType.CHAT])
 
-    lat_best, lat_worst = min(all_latencies), max(all_latencies)
+    # Collect ranges for normalization
+    all_ttft = [p.ttft_ms_p95 for p in all_profiles]
+    all_itl = [p.itl_ms_p95 for p in all_profiles]
+    all_costs = [p.hourly_cost_usd for p in all_profiles]
+    
+    # Throughput metric depends on workload type
+    throughput_metric = workload_profile["throughput_metric"]
+    if throughput_metric == "throughput_at_max_concurrency_tps":
+        all_throughputs = [p.throughput_at_max_concurrency_tps for p in all_profiles]
+    else:
+        all_throughputs = [p.tokens_per_sec for p in all_profiles]
+
+    ttft_best, ttft_worst = min(all_ttft), max(all_ttft)
+    itl_best, itl_worst = min(all_itl), max(all_itl)
     tps_best, tps_worst = max(all_throughputs), min(all_throughputs)
     cost_best, cost_worst = min(all_costs), max(all_costs)
 
-    # -- latency score --
-    # for batch workloads, we care less about TTFT and more about throughput
-    if workload_type == WorkloadType.BATCH:
-        latency_score = 0.5  # neutral — throughput matters more
+    # -- latency score (workload-aware) --
+    latency_weight = workload_profile["latency_weight"]
+    streaming_weight = workload_profile["streaming_weight"]
+    streaming_metric = workload_profile["streaming_metric"]
+    
+    if streaming_metric and (latency_weight > 0 or streaming_weight > 0):
+        # Streaming workload: combine TTFT and ITL
+        ttft_score = _normalize(profile.ttft_ms_p95, ttft_worst, ttft_best)
+        itl_score = _normalize(profile.itl_ms_p95, itl_worst, itl_best)
+        latency_score = (latency_weight * ttft_score) + (streaming_weight * itl_score)
+    elif workload_profile["latency_metric"] and latency_weight > 0:
+        # Non-streaming but latency matters (SUMMARIZATION)
+        latency_score = _normalize(profile.ttft_ms_p95, ttft_worst, ttft_best)
     else:
-        # lower latency = better
-        latency_score = _normalize(profile.ttft_ms_p95, lat_worst, lat_best)
+        # Latency doesn't matter (BATCH, EMBEDDING)
+        latency_score = 0.5  # neutral
 
     # constraint bonus: if user set a latency target, reward meeting it
     meets_latency = None
-    if constraints.max_p95_latency_ms is not None:
+    if constraints.max_p95_latency_ms is not None and workload_profile["latency_metric"]:
         meets_latency = profile.ttft_ms_p95 <= constraints.max_p95_latency_ms
         if meets_latency:
             # bonus for headroom — how much margin do we have?
@@ -88,12 +155,17 @@ def score_candidate(
             overshoot = profile.ttft_ms_p95 / constraints.max_p95_latency_ms
             latency_score *= max(0.1, 1.0 / overshoot)
 
-    # -- throughput score --
-    throughput_score = _normalize(profile.tokens_per_sec, tps_worst, tps_best)
+    # -- throughput score (workload-aware) --
+    if throughput_metric == "throughput_at_max_concurrency_tps":
+        throughput_value = profile.throughput_at_max_concurrency_tps
+    else:
+        throughput_value = profile.tokens_per_sec
+    
+    throughput_score = _normalize(throughput_value, tps_worst, tps_best)
 
     meets_throughput = None
     if constraints.min_throughput_tps is not None:
-        meets_throughput = profile.tokens_per_sec >= constraints.min_throughput_tps
+        meets_throughput = throughput_value >= constraints.min_throughput_tps
         if not meets_throughput:
             throughput_score *= 0.5
 
