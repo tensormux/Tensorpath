@@ -56,6 +56,7 @@ class DeploymentPlan(BaseModel):
     estimated_vram_gb: float
     estimated_hourly_cost_usd: float
     estimated_monthly_cost_usd: float
+    estimated_cost_per_million_tokens: float
 
     scores: PlanScores
     explanation: str

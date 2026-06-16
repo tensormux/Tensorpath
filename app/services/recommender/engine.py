@@ -89,6 +89,11 @@ class RecommendationEngine:
             gpu_name = gpu_spec.name if gpu_spec else profile.gpu_tier
 
             monthly = profile.hourly_cost_usd * 730
+            cost_per_million_tokens = (
+                (profile.hourly_cost_usd / profile.tokens_per_sec) * 1_000_000 / 3600
+                if profile.tokens_per_sec > 0
+                else 0.0
+            )
 
             # flag over-provisioning: if a cheaper GPU meets all constraints,
             # a more expensive one that also meets them is over-provisioned
@@ -121,6 +126,7 @@ class RecommendationEngine:
                 estimated_vram_gb=profile.vram_usage_gb,
                 estimated_hourly_cost_usd=profile.hourly_cost_usd,
                 estimated_monthly_cost_usd=round(monthly, 2),
+                estimated_cost_per_million_tokens=round(cost_per_million_tokens, 2),
                 scores=scores,
                 explanation=explanation,
                 benchmark_source=profile.source,

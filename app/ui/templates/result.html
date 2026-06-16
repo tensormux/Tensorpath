@@ -38,6 +38,10 @@
       <div class="stat-label">Monthly est.</div>
       <div class="stat-value">${{ "%.0f"|format(plan.estimated_monthly_cost_usd) }}</div>
     </div>
+    <div>
+      <div class="stat-label">$/M tokens</div>
+      <div class="stat-value">${{ "%.2f"|format(plan.estimated_cost_per_million_tokens) }}</div>
+    </div>
   </div>
 
   <div class="scores">

@@ -68,6 +68,10 @@
         <div class="stat-label">$/mo</div>
         <div class="stat-value">${{ "%.0f"|format(p.estimated_monthly_cost_usd) }}</div>
       </div>
+      <div>
+        <div class="stat-label">$/M tokens</div>
+        <div class="stat-value">${{ "%.2f"|format(p.estimated_cost_per_million_tokens) }}</div>
+      </div>
     </div>
 
     {% if r.summary %}

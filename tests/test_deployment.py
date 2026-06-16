@@ -19,6 +19,7 @@ def _make_plan(**overrides) -> DeploymentPlan:
         estimated_vram_gb=5.9,
         estimated_hourly_cost_usd=1.50,
         estimated_monthly_cost_usd=1095,
+        estimated_cost_per_million_tokens=7.18,
         scores=PlanScores(
             latency=0.8, throughput=0.7, cost=0.9,
             quality=0.88, simplicity=0.8, weighted_total=0.82,
