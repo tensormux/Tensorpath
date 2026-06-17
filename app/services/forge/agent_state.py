@@ -63,8 +63,10 @@ class AgenticRunState(BaseModel):
     # gate outcomes from the most-recent verify/benchmark calls
     last_verify_passed: bool | None = None
     last_verify_reason: str | None = None
+    last_verify_iteration: int | None = None
     last_benchmark_passed: bool | None = None
     last_speedup: float | None = None
+    last_benchmark_iteration: int | None = None
 
     # final outcome
     error: str | None = None

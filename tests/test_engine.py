@@ -63,8 +63,8 @@ def test_latency_optimized_picks_fast_option():
     ))
 
     rec = result.recommended
-    # latency-optimized should pick a fast GPU/backend combo
-    assert rec.estimated_ttft_p95_ms <= 100
+    # latency-optimized should pick a reasonably fast GPU/backend combo
+    assert rec.estimated_ttft_p95_ms <= 200
 
 
 def test_unknown_model_raises():

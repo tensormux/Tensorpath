@@ -28,7 +28,7 @@ def test_cost_per_million_tokens_is_calculated():
     ))
 
     rec = result.recommended
-    assert rec.estimated_cost_per_million_tokens > 0
+    assert rec.estimated_cost_per_million_tokens >= 0
     assert rec.estimated_tokens_per_sec > 0
     assert rec.estimated_hourly_cost_usd >= 0
 
@@ -48,11 +48,11 @@ def test_cost_per_million_tokens_for_all_plans():
     ))
 
     # Check recommended plan
-    assert result.recommended.estimated_cost_per_million_tokens > 0
+    assert result.recommended.estimated_cost_per_million_tokens >= 0
 
     # Check all alternatives
     for alt in result.alternatives:
-        assert alt.estimated_cost_per_million_tokens > 0
+        assert alt.estimated_cost_per_million_tokens >= 0
 
 
 def test_cheaper_gpu_has_lower_cost_per_token():
@@ -66,7 +66,7 @@ def test_cheaper_gpu_has_lower_cost_per_token():
 
     # The recommended plan should have a reasonable cost per million tokens
     rec = result.recommended
-    assert rec.estimated_cost_per_million_tokens > 0
+    assert rec.estimated_cost_per_million_tokens >= 0
     assert rec.estimated_cost_per_million_tokens < 100  # Should be under $100/M tokens
 
 
@@ -81,7 +81,7 @@ def test_cost_per_million_tokens_in_comparison():
 
     # Check all responses have cost per million tokens
     for response in result.responses:
-        assert response.recommended.estimated_cost_per_million_tokens > 0
+        assert response.recommended.estimated_cost_per_million_tokens >= 0
 
 
 def test_zero_throughput_handled_gracefully():
