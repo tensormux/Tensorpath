@@ -32,6 +32,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from app.services.forge._atomic_write import atomic_write_json
 from app.services.forge.models import (
     BenchmarkResult,
     ForgeRun,
@@ -78,7 +79,8 @@ def _extract_json_object(text: str) -> dict | None:
 
 
 def _write_report(run: ForgeRun, repo_root: Path, result: BenchmarkResult) -> None:
-    (_run_dir(run, repo_root) / "benchmark_report.json").write_text(
+    atomic_write_json(
+        _run_dir(run, repo_root) / "benchmark_report.json",
         result.model_dump_json(indent=2)
     )
 

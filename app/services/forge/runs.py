@@ -29,6 +29,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from app.services.forge._atomic_write import atomic_write_json
 from app.services.forge.models import (
     ForgeRun,
     ForgeRunStatus,
@@ -80,7 +81,7 @@ def create_run(
     artifact_dir.mkdir(parents=True, exist_ok=False)
     (artifact_dir / "candidate").mkdir(parents=True, exist_ok=False)
 
-    (artifact_dir / "task.json").write_text(task.model_dump_json(indent=2))
+    atomic_write_json(artifact_dir / "task.json", task.model_dump_json(indent=2))
 
     run = ForgeRun(
         run_id=rid,
@@ -100,7 +101,8 @@ def write_skill_artifacts(
     repo_root: Path,
 ) -> ForgeRun:
     artifact_dir = repo_root / run.artifact_dir
-    (artifact_dir / "skill_ids.json").write_text(
+    atomic_write_json(
+        artifact_dir / "skill_ids.json",
         json.dumps({"skill_ids": skill_ids}, indent=2)
     )
     (artifact_dir / "skill_bundle.md").write_text(skill_bundle_md)
@@ -158,4 +160,4 @@ def update_run_status(
 
 def _save_run_state(run: ForgeRun, repo_root: Path) -> None:
     artifact_dir = repo_root / run.artifact_dir
-    (artifact_dir / "run.json").write_text(run.model_dump_json(indent=2))
+    atomic_write_json(artifact_dir / "run.json", run.model_dump_json(indent=2))

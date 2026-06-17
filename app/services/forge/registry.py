@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from app.services.forge._atomic_write import atomic_write_json
 from app.services.forge.models import KernelOp, PromotedKernel
 
 
@@ -38,8 +39,7 @@ class KernelRegistry:
             ) from e
 
     def _save(self, data: dict) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(data, indent=2))
+        atomic_write_json(self.path, json.dumps(data, indent=2))
 
     def list_kernels(self) -> list[dict]:
         return list(self._load().get("kernels", []))

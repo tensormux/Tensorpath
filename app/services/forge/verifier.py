@@ -25,6 +25,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from app.services.forge._atomic_write import atomic_write_json
 from app.services.forge.models import (
     ForgeRun,
     ForgeRunStatus,
@@ -138,7 +139,8 @@ def _run_pytest(candidate_dir: Path) -> subprocess.CompletedProcess:
 
 def _write_report(repo_root: Path, run: ForgeRun, result: VerificationResult) -> None:
     artifact_dir = repo_root / run.artifact_dir
-    (artifact_dir / "verification_report.json").write_text(
+    atomic_write_json(
+        artifact_dir / "verification_report.json",
         result.model_dump_json(indent=2)
     )
 
