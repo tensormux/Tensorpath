@@ -334,6 +334,7 @@ def _execute_turn(
     repo_root: Path,
     provider: KernelSkillsProvider,
     state: AgenticRunState,
+    current_iteration: int,
 ) -> tuple[list[dict], dict | None]:
     """Run all tool calls in one assistant turn. Returns (tool_results, give_up_payload)."""
     tool_results: list[dict] = []
@@ -365,6 +366,7 @@ def _execute_turn(
                 rj = _json.loads(result.content)
                 state.last_verify_passed = bool(rj.get("passed"))
                 state.last_verify_reason = rj.get("failure_reason")
+                state.last_verify_iteration = current_iteration
             except Exception:
                 pass
         elif tool_name == "run_benchmark":
@@ -373,6 +375,7 @@ def _execute_turn(
                 rj = _json.loads(result.content)
                 state.last_benchmark_passed = bool(rj.get("passed"))
                 state.last_speedup = rj.get("speedup")
+                state.last_benchmark_iteration = current_iteration
             except Exception:
                 pass
         elif tool_name == "give_up":
@@ -508,6 +511,7 @@ def run_agentic_loop(
                 response=response,
                 run=run, repo_root=repo_root,
                 provider=provider, state=state,
+                current_iteration=iteration,
             )
 
             if not tool_results:
@@ -528,8 +532,13 @@ def run_agentic_loop(
                 save_state(state, run, repo_root)
                 return state
 
-            # Try promotion if both gates passed in this iteration
-            if state.last_verify_passed and state.last_benchmark_passed:
+            # Try promotion if both gates passed in the same iteration
+            if (
+                state.last_verify_passed
+                and state.last_benchmark_passed
+                and state.last_verify_iteration == iteration
+                and state.last_benchmark_iteration == iteration
+            ):
                 if _try_promote(run, repo_root, state):
                     state.status = AgenticRunStatus.SUCCEEDED
                     _sync_abort_flag(state, run, repo_root)
