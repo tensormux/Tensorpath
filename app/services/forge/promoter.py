@@ -27,6 +27,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from app.services.forge._atomic_write import atomic_write_json
 from app.services.forge.benchmarker import MIN_SPEEDUP
 from app.services.forge.models import (
     BenchmarkResult,
@@ -166,7 +167,7 @@ def promote_candidate(
     registry.add_kernel(promoted)
 
     artifact_dir = repo_root / run.artifact_dir
-    (artifact_dir / "promotion.json").write_text(promoted.model_dump_json(indent=2))
+    atomic_write_json(artifact_dir / "promotion.json", promoted.model_dump_json(indent=2))
 
     new_run = update_run_status(run, ForgeRunStatus.PROMOTED, repo_root)
     return new_run, promoted

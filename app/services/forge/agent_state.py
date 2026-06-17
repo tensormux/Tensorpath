@@ -21,6 +21,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from app.services.forge._atomic_write import atomic_write_json
 from app.services.forge.models import ForgeRun
 
 
@@ -114,7 +115,7 @@ def init_state(
 
 def save_state(state: AgenticRunState, run: ForgeRun, repo_root: Path) -> None:
     state.last_updated_at = _now()
-    state_path(repo_root, run).write_text(state.model_dump_json(indent=2))
+    atomic_write_json(state_path(repo_root, run), state.model_dump_json(indent=2))
 
 
 def load_state(run: ForgeRun, repo_root: Path) -> AgenticRunState | None:
