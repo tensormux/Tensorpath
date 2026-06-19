@@ -211,6 +211,19 @@ def _check_abort(run: ForgeRun, repo_root: Path) -> None:
         raise _AbortRequested()
 
 
+def _build_cost_context(state: AgenticRunState, config: AgenticRunConfig, iteration: int) -> str:
+    """Build cost context string for agent awareness."""
+    remaining = config.cost_cap_usd - state.cost_usd
+    remaining_pct = (remaining / config.cost_cap_usd) * 100 if config.cost_cap_usd > 0 else 0
+    
+    return (
+        f"\n\n**Cost & Progress Update (Iteration {iteration}/{config.max_iterations}):**\n"
+        f"- Spent so far: ${state.cost_usd:.4f}\n"
+        f"- Remaining budget: ${remaining:.4f} ({remaining_pct:.1f}% left)\n"
+        f"- Be efficient with your approach — avoid unnecessary iterations\n"
+    )
+
+
 def _sync_abort_flag(state: AgenticRunState, run: ForgeRun, repo_root: Path) -> None:
     """Merge abort flag from disk into in-memory state before save_state().
 
@@ -453,6 +466,15 @@ def run_agentic_loop(
             state.last_message = f"Iteration {iteration}/{config.max_iterations} — calling agent."
             _sync_abort_flag(state, run, repo_root)
             save_state(state, run, repo_root)
+
+            # Inject cost context before each API call
+            cost_context = _build_cost_context(state, config, iteration)
+            if iteration == 1:
+                # For first iteration, append to initial message
+                messages[0]["content"] += cost_context
+            else:
+                # For subsequent iterations, add as a new user message
+                messages.append({"role": "user", "content": cost_context})
 
             response = _run_single_turn_with_retry(
                 client=client,
