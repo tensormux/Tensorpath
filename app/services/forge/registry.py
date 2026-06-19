@@ -27,19 +27,24 @@ class KernelRegistry:
     def __init__(self, repo_root: Path):
         self.repo_root = repo_root
         self.path = repo_root / _REGISTRY_RELATIVE
+        self._cache: dict | None = None
 
     def _load(self) -> dict:
-        if not self.path.exists():
-            return {"kernels": []}
-        try:
-            return json.loads(self.path.read_text())
-        except json.JSONDecodeError as e:
-            raise RuntimeError(
-                f"verified_kernels.json is corrupt at {self.path}: {e}"
-            ) from e
+        if self._cache is None:
+            if not self.path.exists():
+                self._cache = {"kernels": []}
+            else:
+                try:
+                    self._cache = json.loads(self.path.read_text())
+                except json.JSONDecodeError as e:
+                    raise RuntimeError(
+                        f"verified_kernels.json is corrupt at {self.path}: {e}"
+                    ) from e
+        return self._cache
 
     def _save(self, data: dict) -> None:
         atomic_write_json(self.path, json.dumps(data, indent=2))
+        self._cache = None
 
     def list_kernels(self) -> list[dict]:
         return list(self._load().get("kernels", []))

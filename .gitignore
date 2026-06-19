@@ -71,3 +71,4 @@ forge_runs/*
 # Local-only directories
 .venv-bench/
 .claude/
+uv.lock
