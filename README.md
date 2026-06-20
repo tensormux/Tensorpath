@@ -1,3 +1,17 @@
+<p align="center">
+  <img src="header.png" alt="TensorPath" width="100%" />
+</p>
+
+<p align="center">The inference optimization control plane for LLMs.</p>
+
+<p align="center">
+  <a href="https://discord.gg/8YtSjhaVJJ"><img alt="Discord" src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
+  <a href="https://www.tensormux.com/"><img alt="Website" src="https://img.shields.io/badge/website-tensormux.com-blue?style=flat-square" /></a>
+  <a href="https://www.linkedin.com/company/tensormux/"><img alt="LinkedIn" src="https://img.shields.io/badge/LinkedIn-TensorMux-0077B5?style=flat-square&logo=linkedin" /></a>
+</p>
+
+---
+
 # TensorPath — Inference Optimization Control Plane
 
 > Part of the [TensorMux](https://www.tensormux.com/) open-source ecosystem.
@@ -9,9 +23,10 @@ TensorPath tells you the best way to serve an LLM. Give it a model, a workload, 
 **Recommender** — turns workload intent into an optimized deployment plan
 - Generates candidate plans (GPU × backend × quantization) for a model
 - Filters out anything that won't fit in VRAM or beats your budget
-- Scores each on five dimensions: latency, throughput, cost, quality, simplicity
+- Scores each on multiple dimensions with workload-aware metrics
 - Ranks them, explains the top pick, exports a deployment artifact
 - Compares plans across models (`/compare`)
+- Shows cost-per-token efficiency ($/M tokens) for each plan
 
 **Forge** — verified kernel optimization layer
 - Retrieves expert playbooks from `@krxgu/kernel-skills` (npm)
@@ -110,7 +125,7 @@ kernel_registry/   verified_kernels.json (the source of truth)
 forge_runs/        per-run artifacts (gitignored except .gitkeep)
 docs/              FORGE.md, KERNEL_REGISTRY.md, BENCHMARKING.md, CLAIMS.md
 scripts/           forge CLI + demo
-tests/             93 unit tests + 1 opt-in integration test
+tests/             209 unit tests + 1 opt-in integration test
 ```
 
 ## Supported surface (MVP)
@@ -132,6 +147,20 @@ Each candidate is scored on five dimensions:
 5. **simplicity** — operational complexity of the backend (vLLM is simpler than TensorRT-LLM)
 
 Weights shift based on `optimization_priority`. Hard constraints (VRAM, budget × 2, latency, throughput) filter or crush the score before ranking.
+
+## Workload-aware scoring
+
+Different workloads have different priorities. TensorPath adjusts scoring based on workload type:
+
+| Workload | Primary Metrics | Rationale |
+|----------|----------------|-----------|
+| **CHAT** | TTFT (60%) + ITL (40%) | Fast first token + smooth streaming |
+| **CODEGEN** | ITL (50%) + throughput (20%) | Smooth streaming for long outputs |
+| **SUMMARIZATION** | TTFT (70%) | Fast prefill for long inputs |
+| **BATCH** | Throughput only | Latency doesn't matter |
+| **EMBEDDING** | Concurrent throughput | No generation, batch processing |
+
+Each workload type uses the most relevant metrics from your benchmark data.
 
 ## Benchmark data
 
@@ -171,6 +200,14 @@ app/kernels/triton/verified/rmsnorm/
 
 These were written by the agent, verified against a PyTorch RMSNorm reference at multiple shapes including non-power-of-two, and benchmarked at 200 iterations after 25 warmup iterations.
 
+## Reliability features
+
+- **Atomic writes**: All JSON files use write-to-temp-then-rename pattern to prevent corruption
+- **Retry logic**: Agentic loop retries transient API errors (429, 500, 502, 503, 504, 529) with exponential backoff
+- **Abort handling**: Race condition fix ensures abort requests are preserved across state saves
+- **Cost tracking**: Agent is aware of remaining budget and can make cost-conscious decisions
+- **Promotion safety**: Verify and benchmark gates must pass in the same iteration before promotion
+
 ## Why kernel-skills is used
 
 TensorPath uses [`@krxgu/kernel-skills`](https://www.npmjs.com/package/@krxgu/kernel-skills) as an external instruction source for CUDA, Triton, quantization, benchmarking, and kernel optimization workflows.
@@ -190,7 +227,7 @@ All execution happens inside Forge. Forge retrieves skill bundles, creates agent
 
 ```bash
 # default (no GPU required)
-pytest -q                # 93 passed, 1 skipped
+pytest -q                # 209 passed, 1 skipped
 
 # CUDA-required tests (real GPU)
 pytest -m cuda -q
@@ -211,7 +248,13 @@ TensorPath is open source under [github.com/tensormux](https://github.com/tensor
 - [x] verified kernel registry annotated onto recommendation results (op-level evidence)
 - [x] autonomous agentic mode with Claude Opus 4.7 orchestrator
 - [x] real promoted Triton kernels in the registry (RMSNorm on RTX 4070)
+- [x] workload-aware scoring for CHAT, CODEGEN, SUMMARIZATION, BATCH, EMBEDDING
+- [x] cost-per-token metric ($/M tokens) displayed in recommendations
+- [x] retry logic for transient API errors (agentic loop)
+- [x] atomic writes for JSON files (prevents corruption)
+- [x] agent cost awareness (budget tracking in agentic loop)
+- [x] promotion trigger fix (gates must pass in same iteration)
+- [x] 209 unit tests (up from 93)
 - [ ] live deployment integration (currently exports config artifact only)
-- [ ] more models and GPU tiers
 - [ ] runtime-level integration of promoted kernels (currently op-level evidence only — see docs/CLAIMS.md)
 - [ ] more ops in Forge: fused add+RMSNorm, softmax, sampling, KV cache append, dequant, RoPE
