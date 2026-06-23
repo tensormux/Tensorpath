@@ -7,6 +7,11 @@ from pathlib import Path
 
 import pytest
 
+from unittest.mock import patch
+
+from app.schemas import RecommendationRequest, WorkloadType, OptimizationPriority
+from app.services.benchmark_store import BenchmarkStore
+from app.services.runtime_registry import RuntimeRegistry
 from app.services.forge.models import (
     BenchmarkResult,
     KernelLanguage,
@@ -15,6 +20,8 @@ from app.services.forge.models import (
     VerificationResult,
 )
 from app.services.forge.registry import KernelRegistry
+from app.services.optimization import KernelRegistryPass
+from app.services.recommender import RecommendationEngine
 
 
 pytestmark = pytest.mark.forge
@@ -121,3 +128,64 @@ def test_corrupt_registry_raises(tmp_path: Path):
     reg = KernelRegistry(tmp_path)
     with pytest.raises(RuntimeError, match="corrupt"):
         reg.list_kernels()
+
+
+def test_redundant_file_io_in_optimization_passes(tmp_path: Path):
+    # Setup a mock registry path
+    registry_dir = tmp_path / "kernel_registry"
+    registry_dir.mkdir()
+    registry_file = registry_dir / "verified_kernels.json"
+    registry_file.write_text('{"kernels": []}')
+
+    # Instantiate registry with tmp_path as repo_root
+    registry = KernelRegistry(tmp_path)
+    assert registry.path == registry_file
+
+    store = BenchmarkStore()
+    runtime_registry = RuntimeRegistry()
+
+    # Instantiate engine with KernelRegistryPass
+    engine = RecommendationEngine(
+        benchmark_store=store,
+        registry=runtime_registry,
+        optimization_passes=[KernelRegistryPass(registry)],
+    )
+
+    # Track read_text calls on the registry file
+    call_count = 0
+    original_read_text = Path.read_text
+
+    def mock_read_text(self, *args, **kwargs):
+        nonlocal call_count
+        if self.resolve() == registry_file.resolve():
+            call_count += 1
+        return original_read_text(self, *args, **kwargs)
+
+    with patch.object(Path, "read_text", autospec=True, side_effect=mock_read_text):
+        # 1. First recommend call should load the registry once
+        result1 = engine.recommend(RecommendationRequest(
+            model_id="qwen2.5-7b",
+            workload_type=WorkloadType.CHAT,
+            optimization_priority=OptimizationPriority.BALANCED,
+        ))
+        
+        assert call_count == 1, f"Expected exactly 1 file read, got {call_count}"
+
+        # 2. Second recommend call should hit the cache and perform 0 new reads
+        result2 = engine.recommend(RecommendationRequest(
+            model_id="qwen2.5-7b",
+            workload_type=WorkloadType.CHAT,
+            optimization_priority=OptimizationPriority.BALANCED,
+        ))
+        
+        assert call_count == 1, "Expected 0 additional file reads due to memory cache"
+
+        # 3. Adding a kernel should save, clear the cache, and trigger a reload on next check
+        registry.add_kernel(_sample_promoted("kernel_new_1"))
+        
+        # Now list_kernels should reload the file
+        kernels = registry.list_kernels()
+        assert len(kernels) == 1
+        assert kernels[0]["kernel_id"] == "kernel_new_1"
+        assert call_count == 2, f"Expected the file to be read again after add_kernel, got {call_count}"
+
